@@ -796,6 +796,17 @@
       cursor: pointer;
     }
     .jump-btn:hover { text-decoration: underline; }
+    .Box-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--bg-subtle);
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--fg-muted);
+    }
   </style>
 </head>
 <body>
@@ -1047,6 +1058,7 @@
             <div id="activityCommitsList">
               <div class="blankslate">Loading commits...</div>
             </div>
+            <div id="activityCommitsPager" class="Box-footer" style="display:none;"></div>
           </div>
 
           <div class="Box">
@@ -1136,6 +1148,9 @@
       activeTab: "cockpit",
       activityLoaded: false,
       providers: [],
+      activityCommits: [],
+      commitsPage: 1,
+      commitsPerPage: 10,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1878,13 +1893,9 @@
       $("activitySummaryText").textContent = `${feed.commits.length} commits · ${feed.contextEvents.length} notes/tasks across ${activeDays} active day${activeDays === 1 ? "" : "s"}`;
 
       $("activityCommitCount").textContent = String(feed.commits.length);
-      const commitsList = $("activityCommitsList");
-      commitsList.innerHTML = "";
-      if (feed.commits.length === 0) {
-        commitsList.appendChild(el("div", { class: "blankslate", text: "No commits in this window." }));
-      } else {
-        for (const c of feed.commits) commitsList.appendChild(renderCommitRow(c));
-      }
+      state.activityCommits = feed.commits || [];
+      state.commitsPage = 1;
+      renderActivityCommitsPage();
 
       $("activityContextCount").textContent = String(feed.contextEvents.length);
       const ctxList = $("activityContextList");
@@ -1894,6 +1905,70 @@
       } else {
         for (const ev of feed.contextEvents) ctxList.appendChild(renderContextHitRow(ev));
       }
+    }
+
+    function renderActivityCommitsPage() {
+      const total = state.activityCommits.length;
+      const commitsList = $("activityCommitsList");
+      const pager = $("activityCommitsPager");
+      commitsList.innerHTML = "";
+      pager.innerHTML = "";
+
+      if (total === 0) {
+        commitsList.appendChild(el("div", { class: "blankslate", text: "No commits in this window." }));
+        pager.style.display = "none";
+        return;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(total / state.commitsPerPage));
+      state.commitsPage = Math.max(1, Math.min(state.commitsPage, totalPages));
+      const start = (state.commitsPage - 1) * state.commitsPerPage;
+      const end = Math.min(total, start + state.commitsPerPage);
+
+      for (const c of state.activityCommits.slice(start, end)) {
+        commitsList.appendChild(renderCommitRow(c));
+      }
+
+      if (total <= state.commitsPerPage) {
+        pager.style.display = "none";
+        return;
+      }
+
+      pager.style.display = "flex";
+      const prevBtn = el("button", {
+        type: "button",
+        class: "btn btn-sm",
+        text: "Previous",
+        onClick: () => {
+          if (state.commitsPage > 1) {
+            state.commitsPage -= 1;
+            renderActivityCommitsPage();
+          }
+        },
+      });
+      prevBtn.disabled = state.commitsPage <= 1;
+
+      const nextBtn = el("button", {
+        type: "button",
+        class: "btn btn-sm",
+        text: "Next",
+        onClick: () => {
+          if (state.commitsPage < totalPages) {
+            state.commitsPage += 1;
+            renderActivityCommitsPage();
+          }
+        },
+      });
+      nextBtn.disabled = state.commitsPage >= totalPages;
+
+      pager.appendChild(el("span", { text: `Showing ${start + 1}–${end} of ${total}` }));
+      pager.appendChild(
+        el("div", { style: "display:flex;align-items:center;gap:6px;" }, [
+          prevBtn,
+          el("span", { class: "small muted", text: `${state.commitsPage} / ${totalPages}` }),
+          nextBtn,
+        ]),
+      );
     }
 
     async function loadActivityFeed() {

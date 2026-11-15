@@ -212,7 +212,7 @@ export async function collectActivityFeed(
     label,
     allAuthors,
     days,
-    commits: commits.slice(0, 100),
+    commits: commits.slice(0, 250),
     contextEvents: contextEvents.slice(0, 100),
   };
 }
