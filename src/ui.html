@@ -739,6 +739,63 @@
     .mono { font-family: var(--mono); }
     .small { font-size: 12px; }
     .muted { color: var(--fg-muted); }
+
+    /* Activity & Global Search */
+    .activity-stack { display: flex; flex-direction: column; gap: 16px; }
+    .contrib-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 12px 14px;
+      flex-wrap: wrap;
+    }
+    .contrib-cells { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .contrib-cell {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      background: var(--bg-muted);
+      border: 1px solid rgba(240, 246, 252, 0.06);
+    }
+    .contrib-cell.lv-1 { background: #0e4429; border-color: rgba(63, 185, 80, 0.25); }
+    .contrib-cell.lv-2 { background: #006d32; border-color: rgba(63, 185, 80, 0.35); }
+    .contrib-cell.lv-3 { background: #26a641; border-color: rgba(63, 185, 80, 0.45); }
+    .contrib-cell.lv-4 { background: #39d353; border-color: rgba(126, 231, 135, 0.55); }
+    .contrib-legend { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--fg-muted); }
+    .feed-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 880px) {
+      .feed-grid { grid-template-columns: 1fr; }
+    }
+    .kind-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--mono);
+      padding: 1px 6px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .kind-note { color: var(--accent); background: var(--accent-subtle); border-color: rgba(68, 147, 248, 0.35); }
+    .kind-todo { color: var(--attention); background: var(--attention-subtle); border-color: rgba(210, 153, 34, 0.35); }
+    .kind-done { color: var(--success); background: rgba(63, 185, 80, 0.14); border-color: rgba(63, 185, 80, 0.35); }
+    .kind-link { color: var(--done); background: rgba(163, 113, 247, 0.14); border-color: rgba(163, 113, 247, 0.35); }
+    .jump-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--accent);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .jump-btn:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -779,6 +836,14 @@
             <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
           </svg>
           <span>Standup &amp; PRs</span>
+        </span>
+      </button>
+      <button class="underline-tab" data-tab="activity">
+        <span class="tab-inner">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z"/>
+          </svg>
+          <span>Activity &amp; Search</span>
         </span>
       </button>
     </nav>
@@ -914,6 +979,90 @@
         </div>
       </div>
     </section>
+
+    <!-- ACTIVITY & GLOBAL SEARCH -->
+    <section id="tab-activity" style="display:none;">
+      <div class="activity-stack">
+        <div class="Box">
+          <form id="globalSearchForm" class="Box-header">
+            <div class="search-box">
+              <span class="search-icon">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
+                </svg>
+              </span>
+              <input id="globalSearchInput" class="form-control" type="text" placeholder="Search notes, TODOs, PR links, and commit subjects across all repos..." />
+            </div>
+            <label class="btn btn-sm" style="gap:5px;">
+              <input id="globalSearchAllAuthors" type="checkbox" style="margin:0;accent-color:var(--accent-emphasis);" />
+              <span>All authors</span>
+            </label>
+            <button id="globalSearchBtn" type="submit" class="btn btn-primary btn-sm">Search</button>
+            <button id="globalSearchClearBtn" type="button" class="btn btn-sm" style="display:none;">Clear</button>
+          </form>
+          <div id="globalSearchResults"></div>
+        </div>
+
+        <div class="Box">
+          <div class="Box-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-weight:600;font-size:13px;">Contribution Pulse</span>
+              <span id="activitySummaryText" class="small muted"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <select id="activityWindowSelect" class="form-control" style="padding:3px 8px;font-size:12px;">
+                <option value="7d">Last 7 days</option>
+                <option value="14d" selected>Last 14 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+              <label class="btn btn-sm" style="gap:5px;">
+                <input id="activityAllAuthors" type="checkbox" style="margin:0;accent-color:var(--accent-emphasis);" />
+                <span>All authors</span>
+              </label>
+              <button id="activityRefreshBtn" type="button" class="btn btn-sm">Refresh</button>
+            </div>
+          </div>
+          <div class="contrib-bar">
+            <div id="contribCells" class="contrib-cells"></div>
+            <div class="contrib-legend">
+              <span>Less</span>
+              <span class="contrib-cell"></span>
+              <span class="contrib-cell lv-1"></span>
+              <span class="contrib-cell lv-2"></span>
+              <span class="contrib-cell lv-3"></span>
+              <span class="contrib-cell lv-4"></span>
+              <span>More</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="feed-grid">
+          <div class="Box">
+            <div class="Box-header">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:600;font-size:13px;">Recent Commits</span>
+                <span id="activityCommitCount" class="counter">0</span>
+              </div>
+            </div>
+            <div id="activityCommitsList">
+              <div class="blankslate">Loading commits...</div>
+            </div>
+          </div>
+
+          <div class="Box">
+            <div class="Box-header">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:600;font-size:13px;">Recent Notes &amp; Tasks</span>
+                <span id="activityContextCount" class="counter">0</span>
+              </div>
+            </div>
+            <div id="activityContextList">
+              <div class="blankslate">Loading context updates...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- SETTINGS MODAL -->
@@ -968,6 +1117,8 @@
       repoDetail: null,
       confirmUntrackId: null,
       editingLink: false,
+      activeTab: "cockpit",
+      activityLoaded: false,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1537,16 +1688,228 @@
       }
     }
 
+    function isSafeHttpUrl(value) {
+      return typeof value === "string" && /^https?:\/\//i.test(value.trim());
+    }
+
+    function switchTab(tab) {
+      state.activeTab = tab;
+      document.querySelectorAll(".underline-tab").forEach((b) => {
+        b.classList.toggle("active", b.dataset.tab === tab);
+      });
+      $("tab-cockpit").style.display = tab === "cockpit" ? "block" : "none";
+      $("tab-studio").style.display = tab === "studio" ? "block" : "none";
+      $("tab-activity").style.display = tab === "activity" ? "block" : "none";
+      if (tab === "activity" && !state.activityLoaded) {
+        loadActivityFeed();
+      }
+    }
+
+    async function jumpToRepoBranch(commonDir, branch) {
+      if (state.overview.length === 0) {
+        await loadOverview(false);
+      }
+      const match = state.overview.find((item) => item.repo.commonDir === commonDir);
+      if (!match) {
+        notify("Repository is no longer tracked", true);
+        return;
+      }
+      switchTab("cockpit");
+      state.selectedRepoId = match.repo.id;
+      state.confirmUntrackId = null;
+      state.editingLink = false;
+      renderRepoList();
+      await loadRepoDetail(match.repo.id, branch || null);
+    }
+
+    function renderCommitRow(c) {
+      return el("div", { class: "item-row" }, [
+        el("div", { class: "item-main" }, [
+          el("span", { class: "mono small t-amber", text: c.shortHash }),
+          el("div", { style: "min-width:0;flex:1;" }, [
+            el("div", { text: c.subject }),
+            el("div", { class: "small muted", style: "margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;" }, [
+              el("button", {
+                type: "button",
+                class: "jump-btn small",
+                text: c.repoName,
+                onClick: () => jumpToRepoBranch(c.commonDir, null),
+              }),
+              c.authorName ? el("span", { text: c.authorName }) : null,
+              c.committedAt ? el("span", { text: relTime(c.committedAt) }) : null,
+            ]),
+          ]),
+        ]),
+      ]);
+    }
+
+    function renderContextHitRow(item) {
+      const badgeClass =
+        item.kind === "note"
+          ? "kind-note"
+          : item.kind === "link"
+            ? "kind-link"
+            : item.done
+              ? "kind-done"
+              : "kind-todo";
+      const badgeText =
+        item.kind === "note"
+          ? "note"
+          : item.kind === "link"
+            ? "link"
+            : item.done
+              ? "done"
+              : "todo";
+
+      const mainText =
+        item.kind === "link" && isSafeHttpUrl(item.text)
+          ? el("a", { href: item.text, target: "_blank", rel: "noopener noreferrer", text: item.text })
+          : el("span", { class: item.done ? "todo-done" : "", text: item.text });
+
+      const ts = item.timestamp || item.createdAt;
+      return el("div", { class: "item-row" }, [
+        el("div", { class: "item-main" }, [
+          el("span", { class: `kind-badge ${badgeClass}`, text: badgeText }),
+          el("div", { style: "min-width:0;flex:1;" }, [
+            el("div", {}, [mainText]),
+            el("div", { class: "small muted", style: "margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;" }, [
+              el("button", {
+                type: "button",
+                class: "jump-btn small",
+                text: `${item.repoName} / ${item.branch}`,
+                onClick: () => jumpToRepoBranch(item.commonDir, item.branch),
+              }),
+              ts ? el("span", { text: relTime(ts) }) : null,
+            ]),
+          ]),
+        ]),
+      ]);
+    }
+
+    function contribLevel(count, maxCount) {
+      if (count <= 0) return "";
+      if (maxCount <= 1 || count === 1) return "lv-1";
+      const ratio = count / maxCount;
+      if (ratio <= 0.35) return "lv-2";
+      if (ratio <= 0.7) return "lv-3";
+      return "lv-4";
+    }
+
+    function renderActivityFeed(feed) {
+      const cells = $("contribCells");
+      cells.innerHTML = "";
+      const days = feed.days || [];
+      const maxTotal = days.reduce((m, d) => Math.max(m, d.total), 0);
+      for (const day of days) {
+        const lv = contribLevel(day.total, maxTotal);
+        cells.appendChild(
+          el("div", {
+            class: `contrib-cell${lv ? " " + lv : ""}`,
+            title: `${day.date}: ${day.total} update${day.total === 1 ? "" : "s"} (${day.commits} commits, ${day.notes} notes, ${day.todos} tasks)`,
+          }),
+        );
+      }
+
+      const activeDays = days.filter((d) => d.total > 0).length;
+      $("activitySummaryText").textContent = `${feed.commits.length} commits · ${feed.contextEvents.length} notes/tasks across ${activeDays} active day${activeDays === 1 ? "" : "s"}`;
+
+      $("activityCommitCount").textContent = String(feed.commits.length);
+      const commitsList = $("activityCommitsList");
+      commitsList.innerHTML = "";
+      if (feed.commits.length === 0) {
+        commitsList.appendChild(el("div", { class: "blankslate", text: "No commits in this window." }));
+      } else {
+        for (const c of feed.commits) commitsList.appendChild(renderCommitRow(c));
+      }
+
+      $("activityContextCount").textContent = String(feed.contextEvents.length);
+      const ctxList = $("activityContextList");
+      ctxList.innerHTML = "";
+      if (feed.contextEvents.length === 0) {
+        ctxList.appendChild(el("div", { class: "blankslate", text: "No branch notes or tasks saved in this window." }));
+      } else {
+        for (const ev of feed.contextEvents) ctxList.appendChild(renderContextHitRow(ev));
+      }
+    }
+
+    async function loadActivityFeed() {
+      const btn = $("activityRefreshBtn");
+      btn.disabled = true;
+      try {
+        const since = $("activityWindowSelect").value || "14d";
+        const allAuthors = $("activityAllAuthors").checked ? "&allAuthors=true" : "";
+        const feed = await api(`/api/activity?since=${encodeURIComponent(since)}${allAuthors}`);
+        state.activityLoaded = true;
+        renderActivityFeed(feed);
+      } catch (err) {
+        notify(err.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function renderGlobalSearchResults(res) {
+      const container = $("globalSearchResults");
+      container.innerHTML = "";
+      $("globalSearchClearBtn").style.display = "inline-flex";
+
+      const total = res.contextHits.length + res.commitHits.length;
+      if (total === 0) {
+        container.appendChild(el("div", {
+          class: "blankslate",
+          text: `No matching notes, TODOs, links, or commit messages for "${res.query}".`,
+        }));
+        return;
+      }
+
+      container.appendChild(el("div", {
+        class: "Box-row small muted",
+        text: `Found ${total} match${total === 1 ? "" : "es"} (${res.contextHits.length} context, ${res.commitHits.length} commits)`,
+      }));
+
+      for (const hit of res.contextHits) container.appendChild(renderContextHitRow(hit));
+      for (const c of res.commitHits) container.appendChild(renderCommitRow(c));
+    }
+
+    async function executeGlobalSearch() {
+      const q = $("globalSearchInput").value.trim();
+      if (!q) {
+        $("globalSearchResults").innerHTML = "";
+        $("globalSearchClearBtn").style.display = "none";
+        return;
+      }
+      const btn = $("globalSearchBtn");
+      btn.disabled = true;
+      btn.textContent = "Searching...";
+      try {
+        const allAuthors = $("globalSearchAllAuthors").checked ? "&allAuthors=true" : "";
+        const res = await api(`/api/search?q=${encodeURIComponent(q)}${allAuthors}`);
+        renderGlobalSearchResults(res);
+      } catch (err) {
+        notify(err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Search";
+      }
+    }
+
     // Navigation & actions
     document.querySelectorAll(".underline-tab").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".underline-tab").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        const tab = btn.dataset.tab;
-        $("tab-cockpit").style.display = tab === "cockpit" ? "block" : "none";
-        $("tab-studio").style.display = tab === "studio" ? "block" : "none";
-      });
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
     });
+
+    $("globalSearchForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      executeGlobalSearch();
+    });
+    $("globalSearchClearBtn").addEventListener("click", () => {
+      $("globalSearchInput").value = "";
+      $("globalSearchResults").innerHTML = "";
+      $("globalSearchClearBtn").style.display = "none";
+    });
+    $("activityWindowSelect").addEventListener("change", loadActivityFeed);
+    $("activityAllAuthors").addEventListener("change", loadActivityFeed);
+    $("activityRefreshBtn").addEventListener("click", loadActivityFeed);
 
     $("repoSearch").addEventListener("input", renderRepoList);
     $("dirtyOnlyToggle").addEventListener("change", renderRepoList);
@@ -1695,7 +2058,11 @@
       const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
       if (e.key === "/" && !inInput) {
         e.preventDefault();
-        $("repoSearch").focus();
+        if (state.activeTab === "activity") {
+          $("globalSearchInput").focus();
+        } else {
+          $("repoSearch").focus();
+        }
       } else if (e.key === "Escape") {
         if ($("settingsModal").classList.contains("open")) {
           $("settingsModal").classList.remove("open");

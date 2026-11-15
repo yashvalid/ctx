@@ -140,6 +140,38 @@ describe("UI HTTP Server", () => {
       const stJson = (await stRes.json()) as { mode: string; markdown: string };
       expect(stJson.mode).toBe("gemini");
       expect(stJson.markdown).toContain("Demo");
+
+      // Activity endpoint returns 14 buckets + commits + context events
+      const actRes = await fetch(`${baseUrl}/api/activity?since=14d`);
+      expect(actRes.status).toBe(200);
+      const actJson = (await actRes.json()) as {
+        days: Array<{ date: string; total: number }>;
+        commits: Array<{ subject: string }>;
+        contextEvents: Array<{ text: string }>;
+      };
+      expect(actJson.days.length).toBe(14);
+      expect(actJson.commits.some((c) => c.subject.includes("chore: initial"))).toBe(true);
+      expect(actJson.contextEvents.some((e) => e.text.includes("Verify deployment env vars"))).toBe(true);
+      expect(actJson.contextEvents.some((e) => e.text.includes("Write API smoke test"))).toBe(true);
+
+      // Search endpoint validates query parameter and searches context + commits
+      const badSearch = await fetch(`${baseUrl}/api/search`);
+      expect(badSearch.status).toBe(400);
+
+      const noteSearch = await fetch(`${baseUrl}/api/search?q=deployment`);
+      expect(noteSearch.status).toBe(200);
+      const noteSearchJson = (await noteSearch.json()) as {
+        contextHits: Array<{ text: string }>;
+        commitHits: Array<{ subject: string }>;
+      };
+      expect(noteSearchJson.contextHits.some((h) => h.text.includes("Verify deployment env vars"))).toBe(true);
+
+      const commitSearch = await fetch(`${baseUrl}/api/search?q=initial`);
+      expect(commitSearch.status).toBe(200);
+      const commitSearchJson = (await commitSearch.json()) as {
+        commitHits: Array<{ subject: string }>;
+      };
+      expect(commitSearchJson.commitHits.some((c) => c.subject.includes("chore: initial"))).toBe(true);
     } finally {
       server.stop(true);
       store.close();

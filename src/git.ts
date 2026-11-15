@@ -441,6 +441,57 @@ export async function getCommitMetadataSince(
   return commits;
 }
 
+export interface SearchedCommit {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  committedAt: string;
+  authorName: string;
+  authorEmail: string;
+}
+
+export async function searchRepoCommits(
+  rootPath: string,
+  query: string,
+  options: { authorFilter?: string; limit?: number } = {},
+): Promise<SearchedCommit[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const limit = Math.max(1, Math.min(options.limit ?? 25, 200));
+  const args = [
+    "log",
+    `--max-count=${limit}`,
+    "--fixed-strings",
+    "--regexp-ignore-case",
+    `--grep=${trimmed}`,
+    "--date=iso-strict",
+    "--format=%H%x1f%h%x1f%s%x1f%aI%x1f%an%x1f%ae",
+  ];
+  if (options.authorFilter) {
+    args.push(`--author=${options.authorFilter}`);
+  }
+
+  const res = await runGit(rootPath, args);
+  if (!res.ok || !res.stdout) return [];
+
+  const hits: SearchedCommit[] = [];
+  for (const line of res.stdout.split(/\r?\n/)) {
+    if (!line) continue;
+    const [hash, shortHash, subject, committedAt, authorName, authorEmail] = line.split("\x1f");
+    if (!hash || !subject) continue;
+    hits.push({
+      hash,
+      shortHash: shortHash || hash.slice(0, 7),
+      subject,
+      committedAt: committedAt || "",
+      authorName: authorName || "",
+      authorEmail: authorEmail || "",
+    });
+  }
+  return hits;
+}
+
 export async function detectBaseBranch(rootPath: string, currentBranch: string): Promise<string | null> {
   const originHead = await runGit(rootPath, [
     "symbolic-ref",

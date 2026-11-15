@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
 import fs from "node:fs";
 import path from "node:path";
+import { collectActivityFeed, runGlobalSearch } from "./activity.ts";
 import { loadConfig, redactConfig, saveConfig, type StandupFormat } from "./config.ts";
 import { CtxStore } from "./db.ts";
 import {
+  formatActivityFeed,
   formatBranchContextBanner,
   formatBranchSummaryList,
   formatHelp,
   formatRepoOverviewTable,
+  formatSearchResults,
   paint,
 } from "./format.ts";
 import {
@@ -375,6 +378,45 @@ export async function runCli(argv: string[], cwd = process.cwd()): Promise<numbe
       }
       const entries = store.listBranchSummaries();
       console.log(formatBranchSummaryList(entries, nameByDir, true));
+      return 0;
+    }
+
+    if (cmd === "search" || cmd === "find") {
+      const query = positionals.slice(1).join(" ").trim();
+      if (!query) {
+        console.error("Usage: ctx search <query> [--all-authors] [--json]");
+        return 1;
+      }
+
+      await autoTrackIfInsideRepo(store, cwd);
+      await syncWatchedDirs(store);
+
+      const result = await runGlobalSearch(store, query, {
+        allAuthors: flagBool(flags, "all-authors", "all"),
+      });
+
+      if (flagBool(flags, "json")) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(formatSearchResults(result));
+      }
+      return 0;
+    }
+
+    if (cmd === "activity" || cmd === "log") {
+      await autoTrackIfInsideRepo(store, cwd);
+      await syncWatchedDirs(store);
+
+      const feed = await collectActivityFeed(store, {
+        since: flagString(flags, "since"),
+        allAuthors: flagBool(flags, "all-authors", "all"),
+      });
+
+      if (flagBool(flags, "json")) {
+        console.log(JSON.stringify(feed, null, 2));
+      } else {
+        console.log(formatActivityFeed(feed));
+      }
       return 0;
     }
 

@@ -12,6 +12,7 @@ import {
   resolveRepoInfo,
   uninstallPostCheckoutHook,
 } from "./git.ts";
+import { collectActivityFeed, runGlobalSearch } from "./activity.ts";
 import {
   type GeminiCaller,
   generatePrSummary,
@@ -287,6 +288,29 @@ export function startUiServer(options: ServerOptions) {
         });
         if (!out.result) return badRequest(out.error || "Failed to generate PR description");
         return json(out.result);
+      }
+
+      // Cross-repo activity feed
+      if (method === "GET" && pathname === "/api/activity") {
+        const since = url.searchParams.get("since") ?? undefined;
+        const allAuthors =
+          url.searchParams.get("allAuthors") === "1" ||
+          url.searchParams.get("allAuthors") === "true" ||
+          url.searchParams.get("all") === "1";
+        const feed = await collectActivityFeed(store, { since, allAuthors });
+        return json(feed);
+      }
+
+      // Cross-repo global search (notes, TODOs, links, and commit subjects)
+      if (method === "GET" && pathname === "/api/search") {
+        const q = url.searchParams.get("q")?.trim() ?? "";
+        if (!q) return badRequest("q is required");
+        const allAuthors =
+          url.searchParams.get("allAuthors") === "1" ||
+          url.searchParams.get("allAuthors") === "true" ||
+          url.searchParams.get("all") === "1";
+        const result = await runGlobalSearch(store, q, { allAuthors });
+        return json(result);
       }
 
       // Config (always redacted on GET and PUT response)

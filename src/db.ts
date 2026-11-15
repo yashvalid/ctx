@@ -57,6 +57,15 @@ export interface BranchSummaryEntry {
   doneTodoCount: number;
 }
 
+export interface ContextSearchHit {
+  kind: "note" | "todo" | "link";
+  commonDir: string;
+  branch: string;
+  text: string;
+  done?: boolean;
+  timestamp: string | null;
+}
+
 interface RepoRow {
   id: number;
   root_path: string;
@@ -95,6 +104,10 @@ interface MetaRow {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
 }
 
 function mapRepo(row: RepoRow): TrackedRepo {
@@ -521,5 +534,69 @@ export class CtxStore {
       .query("SELECT * FROM notes WHERE common_dir = ?1 ORDER BY branch ASC, id ASC")
       .all(dir) as NoteRow[];
     return rows.map(mapNote);
+  }
+
+  searchContext(query: string, limit = 50): ContextSearchHit[] {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    const pattern = `%${escapeLikePattern(trimmed)}%`;
+    const safeLimit = Math.max(1, Math.min(limit, 200));
+
+    interface SearchRow {
+      kind: "note" | "todo" | "link";
+      common_dir: string;
+      branch: string;
+      text: string;
+      done: number | null;
+      ts: string | null;
+    }
+
+    const rows = this.db
+      .query(
+        `SELECT 'note' AS kind, common_dir, branch, content AS text, NULL AS done, created_at AS ts
+         FROM notes
+         WHERE LOWER(content) LIKE LOWER(?1) ESCAPE '\\'
+         UNION ALL
+         SELECT 'todo' AS kind, common_dir, branch, text, done, COALESCE(completed_at, created_at) AS ts
+         FROM todos
+         WHERE LOWER(text) LIKE LOWER(?1) ESCAPE '\\'
+         UNION ALL
+         SELECT 'link' AS kind, common_dir, branch, link AS text, NULL AS done, COALESCE(updated_at, last_visited_at) AS ts
+         FROM branch_meta
+         WHERE link IS NOT NULL AND link != '' AND LOWER(link) LIKE LOWER(?1) ESCAPE '\\'
+         ORDER BY ts DESC
+         LIMIT ?2`,
+      )
+      .all(pattern, safeLimit) as SearchRow[];
+
+    return rows.map((row) => ({
+      kind: row.kind,
+      commonDir: row.common_dir,
+      branch: row.branch,
+      text: row.text,
+      done: row.kind === "todo" ? row.done === 1 : undefined,
+      timestamp: row.ts,
+    }));
+  }
+
+  getRecentNotesSince(sinceIso: string, limit = 100): BranchNote[] {
+    const safeLimit = Math.max(1, Math.min(limit, 300));
+    const rows = this.db
+      .query("SELECT * FROM notes WHERE created_at >= ?1 ORDER BY created_at DESC, id DESC LIMIT ?2")
+      .all(sinceIso, safeLimit) as NoteRow[];
+    return rows.map(mapNote);
+  }
+
+  getRecentTodosSince(sinceIso: string, limit = 100): BranchTodo[] {
+    const safeLimit = Math.max(1, Math.min(limit, 300));
+    const rows = this.db
+      .query(
+        `SELECT * FROM todos
+         WHERE created_at >= ?1 OR (completed_at IS NOT NULL AND completed_at >= ?1)
+         ORDER BY COALESCE(completed_at, created_at) DESC, id DESC
+         LIMIT ?2`,
+      )
+      .all(sinceIso, safeLimit) as TodoRow[];
+    return rows.map(mapTodo);
   }
 }

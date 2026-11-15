@@ -57,6 +57,9 @@ describe("CLI end-to-end", () => {
       expect(await runCli(["link", "https://linear.app/team/issue/ENG-101"], repoDir)).toBe(0);
       expect(await runCli(["hook", "install"], repoDir)).toBe(0);
       expect(await runCli(["status", "--json"], repoDir)).toBe(0);
+      expect(await runCli(["search", "Redis"], repoDir)).toBe(0);
+      expect(await runCli(["search", "ttl cache", "--json"], repoDir)).toBe(0);
+      expect(await runCli(["activity", "--since", "7d"], repoDir)).toBe(0);
       expect(await runCli(["standup", "--raw"], repoDir)).toBe(0);
       expect(await runCli(["pr", "--raw"], repoDir)).toBe(0);
     } finally {
@@ -69,6 +72,8 @@ describe("CLI end-to-end", () => {
     expect(joined).toContain("ENG-101");
     expect(joined).toContain("Benchmark cache hit rate");
     expect(joined).toContain("feat: add ttl cache");
+    expect(joined).toContain("Search:");
+    expect(joined).toContain("Recent Activity");
 
     // Verify real git checkout triggers the installed post-checkout hook without error
     const toMain = await runGit(repoDir, ["checkout", "main"]);

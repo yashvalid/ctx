@@ -1,3 +1,4 @@
+import type { ActivityFeedResult, GlobalSearchResult } from "./activity.ts";
 import type { BranchContext, BranchSummaryEntry } from "./db.ts";
 import type { RepoStatus } from "./git.ts";
 import type { RepoOverviewItem } from "./sync.ts";
@@ -182,6 +183,106 @@ export function formatBranchSummaryList(
     .join("\n");
 }
 
+export function formatSearchResults(result: GlobalSearchResult): string {
+  const total = result.contextHits.length + result.commitHits.length;
+  const lines: string[] = [
+    `${paint.bold(`Search: "${result.query}"`)}  ${paint.dim(`(${total} match${total === 1 ? "" : "es"})`)}`,
+  ];
+
+  if (total === 0) {
+    lines.push(paint.dim("  No matching notes, TODOs, links, or commit messages found."));
+    return lines.join("\n");
+  }
+
+  if (result.contextHits.length > 0) {
+    lines.push("");
+    lines.push(paint.bold(`Context (${result.contextHits.length}):`));
+    for (const hit of result.contextHits) {
+      const badge =
+        hit.kind === "note"
+          ? paint.cyan("[note]")
+          : hit.kind === "link"
+            ? paint.blue("[link]")
+            : hit.done
+              ? paint.green("[done]")
+              : paint.yellow("[todo]");
+      const when = hit.timestamp ? paint.dim(` (${formatRelativeTime(hit.timestamp)})`) : "";
+      lines.push(`  ${badge} ${paint.bold(hit.repoName)} ${paint.cyan(hit.branch)}: ${hit.text}${when}`);
+    }
+  }
+
+  if (result.commitHits.length > 0) {
+    lines.push("");
+    lines.push(paint.bold(`Commits (${result.commitHits.length}):`));
+    for (const commit of result.commitHits) {
+      const when = formatRelativeTime(commit.committedAt);
+      lines.push(
+        `  ${paint.yellow(commit.shortHash)} ${paint.bold(commit.repoName)}: ${commit.subject} ${paint.dim(`(${when})`)}`,
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+export function formatActivityFeed(feed: ActivityFeedResult): string {
+  const lines: string[] = [
+    `${paint.bold(`Recent Activity (${feed.label})`)}  ${paint.dim(`${feed.commits.length} commits, ${feed.contextEvents.length} notes/tasks`)}`,
+  ];
+
+  if (feed.days.length > 0) {
+    const pulse = feed.days
+      .map((d) => {
+        if (d.total === 0) return paint.dim(".");
+        if (d.total <= 2) return paint.green("o");
+        if (d.total <= 5) return paint.green("*");
+        return paint.green("#");
+      })
+      .join("");
+    const activeDays = feed.days.filter((d) => d.total > 0).length;
+    lines.push(`  ${paint.dim(`${feed.days.length}d pulse:`)} [${pulse}] ${paint.dim(`(${activeDays} active day${activeDays === 1 ? "" : "s"})`)}`);
+  }
+
+  if (feed.commits.length === 0 && feed.contextEvents.length === 0) {
+    lines.push(paint.dim("  No activity recorded in this window."));
+    return lines.join("\n");
+  }
+
+  if (feed.commits.length > 0) {
+    lines.push("");
+    lines.push(paint.bold(`Commits (${feed.commits.length}):`));
+    for (const c of feed.commits.slice(0, 15)) {
+      lines.push(
+        `  ${paint.yellow(c.shortHash)} ${paint.bold(c.repoName)}: ${c.subject} ${paint.dim(`(${formatRelativeTime(c.committedAt)})`)}`,
+      );
+    }
+    if (feed.commits.length > 15) {
+      lines.push(paint.dim(`  ...and ${feed.commits.length - 15} more commits`));
+    }
+  }
+
+  if (feed.contextEvents.length > 0) {
+    lines.push("");
+    lines.push(paint.bold(`Notes & TODOs (${feed.contextEvents.length}):`));
+    for (const ev of feed.contextEvents.slice(0, 15)) {
+      const badge =
+        ev.kind === "note"
+          ? paint.cyan("[note]")
+          : ev.done
+            ? paint.green("[done]")
+            : paint.yellow("[todo]");
+      lines.push(
+        `  ${badge} ${paint.bold(ev.repoName)} ${paint.cyan(ev.branch)}: ${ev.text} ${paint.dim(`(${formatRelativeTime(ev.timestamp)})`)}`,
+      );
+    }
+    if (feed.contextEvents.length > 15) {
+      lines.push(paint.dim(`  ...and ${feed.contextEvents.length - 15} more updates`));
+    }
+  }
+
+  return lines.join("\n");
+}
+
 export function formatHelp(): string {
   return [
     `${paint.bold("ctx")} — Git multi-repo cockpit, branch context memory, and AI standup/PR summarizer`,
@@ -198,6 +299,10 @@ export function formatHelp(): string {
     "  ctx link [<url>] [--clear]",
     "                            Attach or view a PR / Jira / Linear link on the current branch",
     "  ctx branches [--all]      List branches with saved context or recent visits",
+    "  ctx search <query> [--all-authors] [--json]",
+    "                            Search notes, TODOs, links, and commit subjects across repos (alias: find)",
+    "  ctx activity [--since 14d] [--all-authors] [--json]",
+    "                            Show cross-repo commit and context activity timeline (alias: log)",
     "",
     paint.bold("AI Summaries (metadata-only via Gemini):"),
     "  ctx standup [--since 2d] [--all-authors] [--format slack|markdown] [--raw] [--copy]",

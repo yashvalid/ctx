@@ -6,6 +6,7 @@ Local Git multi-repo cockpit, branch-tied context memory, and metadata-only Gemi
 
 - **Multi-repo status (`ctx status` / `ctx ui`)**: Tracks any repository you run `ctx` inside plus any watched parent folders (`ctx watch <dir>`), showing active branches, staged/modified/untracked counts, ahead/behind counts, stashes, and open TODOs.
 - **Branch-tied notes, TODOs & links**: Store notes, checkable TODOs, and PR/ticket URLs in a central local SQLite database (`%LOCALAPPDATA%\ctx\ctx.db` on Windows) so your repositories stay completely clean. Worktrees of the same repo automatically share branch context.
+- **Cross-repo search & activity (`ctx search`, `ctx activity`)**: Search across branch notes, TODOs, PR/ticket links, and commit subjects in one query, or view a cross-repo timeline and contribution pulse in both the terminal and the **Activity & Search** tab in `ctx ui`.
 - **Opt-in branch recall (`ctx hook install`)**: Installs a safe `post-checkout` hook (preserving any existing hook script) that records branch visits and prints your saved notes & open TODOs when switching branches in your terminal.
 - **Metadata-only Gemini summaries (`ctx standup`, `ctx pr`)**: Summarizes your daily standup (smart last-workday window, filtered to your `git config user.email` by default) or drafts a PR description. **Only commit subjects, changed file paths/line counts, and your notes/TODOs are sent to Gemini — never source code diffs.** Falls back cleanly to structured offline Markdown if `GEMINI_API_KEY` is missing or unreachable.
 
@@ -24,6 +25,8 @@ ctx hook install          # optional: print context when switching branches
 # Multi-repo cockpit & summaries:
 ctx watch C:\path\to\projects
 ctx status                # add --dirty or --fetch
+ctx search "retry"        # search notes, TODOs, links, and commit subjects
+ctx activity --since 14d  # cross-repo commit & context activity feed
 ctx standup --copy        # uses GEMINI_API_KEY, falls back offline if unset
 ctx pr --copy             # draft PR description for current branch
 ctx ui                    # launch local dashboard at http://127.0.0.1:4312
