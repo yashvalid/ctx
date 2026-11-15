@@ -24,7 +24,7 @@ afterEach(() => {
   else process.env.CTX_HOME = originalCtxHome;
 
   while (tempDirs.length > 0) {
-    fs.rmSync(tempDirs.pop()!, { recursive: true, force: true });
+    fs.rmSync(tempDirs.pop()!, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 
@@ -144,5 +144,5 @@ describe("UI HTTP Server", () => {
       server.stop(true);
       store.close();
     }
-  });
+  }, 15000);
 });

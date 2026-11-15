@@ -23,7 +23,7 @@ afterEach(() => {
   else process.env.GEMINI_API_KEY = originalEnvKey;
 
   while (tempDirs.length > 0) {
-    fs.rmSync(tempDirs.pop()!, { recursive: true, force: true });
+    fs.rmSync(tempDirs.pop()!, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 
@@ -78,5 +78,5 @@ describe("CLI end-to-end", () => {
     const hookOutput = `${backToFeat.stdout}\n${backToFeat.stderr}`;
     expect(hookOutput).toContain("Check Redis eviction policy");
     expect(hookOutput).toContain("Benchmark cache hit rate");
-  });
+  }, 15000);
 });

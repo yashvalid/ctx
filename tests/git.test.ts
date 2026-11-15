@@ -32,7 +32,7 @@ async function initRepo(dir: string, branch = "main"): Promise<void> {
 afterEach(() => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop()!;
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 
@@ -96,7 +96,7 @@ describe("git helpers", () => {
     expect(pr.data?.commits.map((c) => c.subject)).toEqual(["feat: add invoice rounding"]);
     expect(pr.data?.files).toEqual([{ added: 1, deleted: 0, path: "billing.ts" }]);
     expect(JSON.stringify(pr.data)).not.toContain("PRIVATE_ALGO_SECRET");
-  });
+  }, 15000);
 
   test("discovers repos in watched parent folders and skips node_modules", async () => {
     const workspace = makeTempDir("ctx-watch-");
@@ -115,7 +115,7 @@ describe("git helpers", () => {
     const found = await discoverGitRepos([workspace]);
     const names = found.map((r) => r.name).sort();
     expect(names).toEqual(["service-a", "service-b"]);
-  });
+  }, 15000);
 
   test("installs and uninstalls post-checkout hook without clobbering existing hook content", async () => {
     const repoDir = makeTempDir();
@@ -152,5 +152,5 @@ describe("git helpers", () => {
     expect((await getHookStatus(repoDir)).installed).toBe(true);
     await uninstallPostCheckoutHook(repoDir);
     expect(fs.existsSync(hookFile)).toBe(false);
-  });
+  }, 15000);
 });

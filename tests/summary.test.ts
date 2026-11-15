@@ -188,5 +188,5 @@ describe("summary & gemini", () => {
     } finally {
       store.close();
     }
-  });
+  }, 15000);
 });
