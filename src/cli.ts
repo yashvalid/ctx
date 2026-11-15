@@ -708,7 +708,7 @@ export async function runCli(argv: string[], cwd = process.cwd()): Promise<numbe
         } else if (key === "model" || key === "llmModel" || key === "geminiModel") {
           cfg.llmModel = undefined;
           if (key === "geminiModel" || (cfg.llmProvider ?? "gemini") === "gemini") {
-            cfg.geminiModel = "gemini-2.5-flash";
+            cfg.geminiModel = "gemini-3-flash-preview";
           }
         } else if (key === "apiKey" || key === "llmApiKey" || key === "geminiKey") {
           cfg.llmApiKey = undefined;

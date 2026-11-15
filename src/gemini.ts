@@ -84,12 +84,21 @@ async function fetchJsonWithTimeout<T>(
   }
 }
 
-/** Call the Google Gemini generateContent REST API using x-goog-api-key header auth. */
-export async function callGemini(req: GeminiRequest): Promise<GeminiResult> {
-  const timeoutMs = req.timeoutMs ?? 20000;
+const GEMINI_FALLBACK_MODELS = [
+  "gemini-3-flash-preview",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite-preview",
+];
+
+async function callGeminiSingle(
+  req: GeminiRequest,
+  modelName: string,
+  timeoutMs: number,
+): Promise<GeminiResult & { retryable?: boolean }> {
   const doFetch = req.fetchImpl ?? fetch;
   const baseUrl = (req.baseUrl || LLM_PROVIDERS.gemini.defaultBaseUrl).replace(/\/+$/, "");
-  const url = `${baseUrl}/models/${encodeURIComponent(req.model)}:generateContent`;
+  const cleanModel = modelName.trim().replace(/^models\//i, "");
+  const url = `${baseUrl}/models/${encodeURIComponent(cleanModel)}:generateContent`;
 
   const res = await fetchJsonWithTimeout<GeminiApiResponse>(
     "Gemini",
@@ -119,10 +128,17 @@ export async function callGemini(req: GeminiRequest): Promise<GeminiResult> {
     doFetch,
   );
 
-  if (!res.ok) return res;
+  if (!res.ok) {
+    return { ...res, retryable: true };
+  }
   if (res.status < 200 || res.status >= 300) {
     const apiMsg = res.data.error?.message || `HTTP ${res.status} ${res.statusText}`;
-    return { ok: false, error: `Gemini API error: ${apiMsg}` };
+    const retryable =
+      res.status === 404 ||
+      res.status === 503 ||
+      res.status === 429 ||
+      /no longer available|not found|unavailable/i.test(apiMsg);
+    return { ok: false, error: `Gemini API error: ${apiMsg}`, retryable };
   }
 
   const parts = res.data.candidates?.[0]?.content?.parts ?? [];
@@ -132,9 +148,34 @@ export async function callGemini(req: GeminiRequest): Promise<GeminiResult> {
     .trim();
 
   if (!text) {
-    return { ok: false, error: "Gemini returned an empty response." };
+    return { ok: false, error: "Gemini returned an empty response.", retryable: false };
   }
   return { ok: true, text };
+}
+
+/** Call the Google Gemini generateContent REST API using x-goog-api-key header auth. */
+export async function callGemini(req: GeminiRequest): Promise<GeminiResult> {
+  const primaryModel = req.model.trim().replace(/^models\//i, "") || LLM_PROVIDERS.gemini.defaultModel;
+  const timeoutMs = req.timeoutMs ?? 20000;
+  const first = await callGeminiSingle(req, primaryModel, timeoutMs);
+  if (first.ok) {
+    return { ok: true, text: first.text };
+  }
+
+  if (!first.retryable || req.fetchImpl) {
+    return { ok: false, error: first.error };
+  }
+
+  const fallbackTimeoutMs = Math.min(timeoutMs, 12000);
+  for (const candidate of GEMINI_FALLBACK_MODELS) {
+    if (candidate === primaryModel) continue;
+    const retry = await callGeminiSingle(req, candidate, fallbackTimeoutMs);
+    if (retry.ok) {
+      return { ok: true, text: retry.text };
+    }
+  }
+
+  return { ok: false, error: first.error };
 }
 
 async function callAnthropic(req: LlmRequest): Promise<GeminiResult> {

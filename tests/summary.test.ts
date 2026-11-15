@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { resolveLlmSettings } from "../src/config.ts";
+import { normalizeGeminiModel, resolveLlmSettings } from "../src/config.ts";
 import { CtxStore } from "../src/db.ts";
 import { callGemini, callLlm } from "../src/gemini.ts";
 import { resolveRepoInfo, runGit } from "../src/git.ts";
@@ -196,6 +196,9 @@ describe("summary & gemini", () => {
   }, 15000);
 
   test("humanizeCommitSubject cleans conventional commit prefixes and callLlm supports OpenAI, Anthropic, and Ollama", async () => {
+    expect(normalizeGeminiModel("gemini-2.5-flash")).toBe("gemini-3-flash-preview");
+    expect(normalizeGeminiModel("models/gemini-3.5-flash")).toBe("gemini-3.5-flash");
+
     expect(humanizeCommitSubject("feat(ui): add dark theme.")).toBe("Add dark theme");
     expect(humanizeCommitSubject("fix!: handle 429 retry-after")).toBe("Handle 429 retry-after");
     expect(humanizeCommitSubject("Refactor token cache")).toBe("Refactor token cache");

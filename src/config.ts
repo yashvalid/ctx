@@ -26,7 +26,7 @@ export const LLM_PROVIDERS: Record<LlmProvider, LlmProviderInfo> = {
   gemini: {
     id: "gemini",
     label: "Google Gemini",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: "gemini-3-flash-preview",
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
     envVar: "GEMINI_API_KEY",
     requiresKey: true,
@@ -130,10 +130,18 @@ export interface LlmSettings {
 }
 
 const DEFAULT_CONFIG: CtxConfig = {
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-3-flash-preview",
   standupFormat: "markdown",
   llmProvider: "gemini",
 };
+
+export function normalizeGeminiModel(raw: string): string {
+  const stripped = raw.trim().replace(/^models\//i, "");
+  if (!stripped || stripped === "gemini-2.5-flash") {
+    return LLM_PROVIDERS.gemini.defaultModel;
+  }
+  return stripped;
+}
 
 /** Resolve the application data directory, honoring CTX_HOME for isolated runs/tests. */
 export function getDataDir(): string {
@@ -193,12 +201,18 @@ export function loadConfig(): CtxConfig {
   try {
     const raw = fs.readFileSync(file, "utf8");
     const parsed = JSON.parse(raw) as Partial<CtxConfig>;
+    const provider = isLlmProvider(parsed.llmProvider) ? parsed.llmProvider : "gemini";
+    const rawGeminiModel = nonEmpty(parsed.geminiModel) ?? DEFAULT_CONFIG.geminiModel;
+    const rawLlmModel = nonEmpty(parsed.llmModel);
     return {
       geminiKey: nonEmpty(parsed.geminiKey),
-      geminiModel: nonEmpty(parsed.geminiModel) ?? DEFAULT_CONFIG.geminiModel,
+      geminiModel: normalizeGeminiModel(rawGeminiModel),
       standupFormat: parsed.standupFormat === "slack" ? "slack" : "markdown",
-      llmProvider: isLlmProvider(parsed.llmProvider) ? parsed.llmProvider : "gemini",
-      llmModel: nonEmpty(parsed.llmModel),
+      llmProvider: provider,
+      llmModel:
+        rawLlmModel && provider === "gemini"
+          ? normalizeGeminiModel(rawLlmModel)
+          : rawLlmModel,
       llmApiKey: nonEmpty(parsed.llmApiKey),
       llmBaseUrl: nonEmpty(parsed.llmBaseUrl),
     };
@@ -257,7 +271,8 @@ export function resolveLlmSettings(
   const cfgModel =
     (sameAsConfigured ? nonEmpty(config.llmModel) : undefined) ??
     (provider === "gemini" ? nonEmpty(config.geminiModel) : undefined);
-  const model = overrides.model?.trim() || envModel || cfgModel || info.defaultModel;
+  const rawModel = overrides.model?.trim() || envModel || cfgModel || info.defaultModel;
+  const model = provider === "gemini" ? normalizeGeminiModel(rawModel) : rawModel;
 
   const rawBaseUrl =
     overrides.baseUrl?.trim() ||
