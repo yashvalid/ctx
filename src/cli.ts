@@ -2,7 +2,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { collectActivityFeed, runGlobalSearch } from "./activity.ts";
-import { loadConfig, redactConfig, saveConfig, type StandupFormat } from "./config.ts";
+import {
+  isLlmProvider,
+  LLM_PROVIDERS,
+  loadConfig,
+  redactConfig,
+  saveConfig,
+  type LlmProvider,
+  type StandupFormat,
+} from "./config.ts";
 import { CtxStore } from "./db.ts";
 import {
   formatActivityFeed,
@@ -38,6 +46,8 @@ const VALUE_FLAGS = new Set([
   "branch",
   "since",
   "format",
+  "provider",
+  "model",
   "base",
   "repo",
   "port",
@@ -439,12 +449,20 @@ export async function runCli(argv: string[], cwd = process.cwd()): Promise<numbe
       const format: StandupFormat | undefined =
         rawFormat === "slack" || rawFormat === "markdown" ? rawFormat : undefined;
 
+      const rawProvider = flagString(flags, "provider")?.toLowerCase();
+      if (rawProvider && !isLlmProvider(rawProvider)) {
+        console.error(`Unknown LLM provider: ${rawProvider}. Supported: ${Object.keys(LLM_PROVIDERS).join(", ")}`);
+        return 1;
+      }
+
       const out = await generateStandupSummary(store, {
         since: flagString(flags, "since"),
         allAuthors: flagBool(flags, "all-authors", "all"),
         repoIds,
         format,
         raw: flagBool(flags, "raw"),
+        provider: rawProvider as LlmProvider | undefined,
+        model: flagString(flags, "model"),
       });
 
       if (out.warning) {
@@ -476,10 +494,18 @@ export async function runCli(argv: string[], cwd = process.cwd()): Promise<numbe
         repo = store.upsertRepo(info);
       }
 
+      const rawProvider = flagString(flags, "provider")?.toLowerCase();
+      if (rawProvider && !isLlmProvider(rawProvider)) {
+        console.error(`Unknown LLM provider: ${rawProvider}. Supported: ${Object.keys(LLM_PROVIDERS).join(", ")}`);
+        return 1;
+      }
+
       const out = await generatePrSummary(store, repo, {
         baseBranch: flagString(flags, "base"),
         branch: flagString(flags, "b", "branch"),
         raw: flagBool(flags, "raw"),
+        provider: rawProvider as LlmProvider | undefined,
+        model: flagString(flags, "model"),
       });
 
       if (!out.result) {
@@ -629,13 +655,40 @@ export async function runCli(argv: string[], cwd = process.cwd()): Promise<numbe
         const key = positionals[2];
         const value = positionals.slice(3).join(" ").trim();
         if (!key || !value) {
-          console.error("Usage: ctx config set <geminiKey|geminiModel|standupFormat> <value>");
+          console.error(
+            "Usage: ctx config set <provider|model|apiKey|baseUrl|standupFormat|geminiKey|geminiModel> <value>",
+          );
           return 1;
         }
         const cfg = loadConfig();
-        if (key === "geminiKey") cfg.geminiKey = value;
-        else if (key === "geminiModel") cfg.geminiModel = value;
-        else if (key === "standupFormat" && (value === "markdown" || value === "slack")) {
+        if (key === "provider" || key === "llmProvider") {
+          const lower = value.toLowerCase();
+          if (!isLlmProvider(lower)) {
+            console.error(`Unknown provider: ${value}. Supported: ${Object.keys(LLM_PROVIDERS).join(", ")}`);
+            return 1;
+          }
+          if (cfg.llmProvider !== lower) {
+            cfg.llmModel = undefined;
+            cfg.llmBaseUrl = undefined;
+          }
+          cfg.llmProvider = lower;
+        } else if (key === "model" || key === "llmModel" || key === "geminiModel") {
+          cfg.llmModel = value;
+          if (key === "geminiModel" || (cfg.llmProvider ?? "gemini") === "gemini") {
+            cfg.geminiModel = value;
+          }
+        } else if (key === "apiKey" || key === "llmApiKey" || key === "geminiKey") {
+          cfg.llmApiKey = value;
+          if (key === "geminiKey" || (cfg.llmProvider ?? "gemini") === "gemini") {
+            cfg.geminiKey = value;
+          }
+        } else if (key === "baseUrl" || key === "llmBaseUrl") {
+          if (!/^https?:\/\//i.test(value)) {
+            console.error("baseUrl must start with http:// or https://");
+            return 1;
+          }
+          cfg.llmBaseUrl = value.replace(/\/+$/, "");
+        } else if (key === "standupFormat" && (value === "markdown" || value === "slack")) {
           cfg.standupFormat = value;
         } else {
           console.error(`Invalid config key or value: ${key}=${value}`);
@@ -648,10 +701,25 @@ export async function runCli(argv: string[], cwd = process.cwd()): Promise<numbe
       if (action === "unset") {
         const key = positionals[2];
         const cfg = loadConfig();
-        if (key === "geminiKey") cfg.geminiKey = undefined;
-        else if (key === "geminiModel") cfg.geminiModel = "gemini-2.5-flash";
-        else if (key === "standupFormat") cfg.standupFormat = "markdown";
-        else {
+        if (key === "provider" || key === "llmProvider") {
+          cfg.llmProvider = "gemini";
+          cfg.llmModel = undefined;
+          cfg.llmBaseUrl = undefined;
+        } else if (key === "model" || key === "llmModel" || key === "geminiModel") {
+          cfg.llmModel = undefined;
+          if (key === "geminiModel" || (cfg.llmProvider ?? "gemini") === "gemini") {
+            cfg.geminiModel = "gemini-2.5-flash";
+          }
+        } else if (key === "apiKey" || key === "llmApiKey" || key === "geminiKey") {
+          cfg.llmApiKey = undefined;
+          if (key === "geminiKey" || (cfg.llmProvider ?? "gemini") === "gemini") {
+            cfg.geminiKey = undefined;
+          }
+        } else if (key === "baseUrl" || key === "llmBaseUrl") {
+          cfg.llmBaseUrl = undefined;
+        } else if (key === "standupFormat") {
+          cfg.standupFormat = "markdown";
+        } else {
           console.error(`Unknown config key: ${key ?? ""}`);
           return 1;
         }

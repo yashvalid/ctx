@@ -1,7 +1,7 @@
-import type { CtxConfig, StandupFormat } from "./config.ts";
-import { loadConfig, resolveGeminiSettings } from "./config.ts";
+import type { CtxConfig, LlmProvider, LlmSettings, StandupFormat } from "./config.ts";
+import { loadConfig, resolveLlmSettings } from "./config.ts";
 import type { BranchNote, BranchTodo, CtxStore, TrackedRepo } from "./db.ts";
-import { callGemini, type GeminiRequest } from "./gemini.ts";
+import { callLlm, type GeminiRequest, type GeminiResult } from "./gemini.ts";
 import {
   type CommitMetadata,
   getCommitMetadataSince,
@@ -44,12 +44,24 @@ export interface PrPayload {
 
 export interface SummaryOutput<T> {
   mode: "gemini" | "fallback" | "raw";
+  provider?: LlmProvider;
+  model?: string;
   warning?: string;
   markdown: string;
   payload: T;
 }
 
-export type GeminiCaller = (req: GeminiRequest) => ReturnType<typeof callGemini>;
+export type GeminiCaller = (req: GeminiRequest) => Promise<GeminiResult>;
+
+const CONVENTIONAL_PREFIX_RE =
+  /^(feat|fix|chore|docs|test|refactor|perf|build|ci|style|revert)(\([^)]+\))?!?:\s*/i;
+
+/** Convert a raw commit subject like "feat(ui): add button" into clean readable prose. */
+export function humanizeCommitSubject(subject: string): string {
+  const cleaned = subject.trim().replace(CONVENTIONAL_PREFIX_RE, "").replace(/\.+$/, "").trim();
+  if (!cleaned) return subject.trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
 
 /**
  * Compute default standup cutoff: local midnight of the previous workday
@@ -179,73 +191,148 @@ export async function collectStandupPayload(
   };
 }
 
+function uniqueReadableCommits(commits: CommitMetadata[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of commits) {
+    const label = humanizeCommitSubject(c.subject);
+    const key = label.toLowerCase();
+    if (!label || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
 export function formatStandupFallback(
   payload: StandupPayload,
   format: StandupFormat = "markdown",
 ): string {
   if (payload.repos.length === 0) {
-    return `No commits, WIP files, or branch TODOs found (${payload.sinceLabel}).`;
+    return `No recent commits, uncommitted changes, or open tasks found (${payload.sinceLabel}).`;
   }
 
-  const h = (title: string) => (format === "slack" ? `*${title}*` : `## ${title}`);
-  const yesterdayLines: string[] = [];
-  const todayLines: string[] = [];
+  const h2 = (title: string) => (format === "slack" ? `*${title}*` : `## ${title}`);
+  const h3 = (title: string) => (format === "slack" ? `*${title}*` : `### ${title}`);
+  const bold = (text: string) => (format === "slack" ? `*${text}*` : `**${text}**`);
+
+  const completedSections: string[] = [];
+  const inProgressSections: string[] = [];
+  const noteLines: string[] = [];
 
   for (const repo of payload.repos) {
-    for (const c of repo.commits) {
-      const filesPreview = c.files.slice(0, 4).map((f) => f.path).join(", ");
-      const suffix = c.files.length > 4 ? ` (+${c.files.length - 4} more)` : "";
-      yesterdayLines.push(
-        `- [${repo.repoName}] ${c.subject} (${c.shortHash}${filesPreview ? `: ${filesPreview}${suffix}` : ""})`,
-      );
-    }
-    for (const done of repo.completedTodos) {
-      yesterdayLines.push(`- [${repo.repoName}:${done.branch}] Completed TODO: ${done.text}`);
+    const commitItems = uniqueReadableCommits(repo.commits);
+    const repoCompleted: string[] = [
+      ...commitItems.map((line) => `- ${line}`),
+      ...repo.completedTodos.map((done) => `- Completed: ${done.text}`),
+    ];
+    if (repoCompleted.length > 0) {
+      completedSections.push(`${h3(repo.repoName)}\n${repoCompleted.join("\n")}`);
     }
 
-    for (const todo of repo.openTodos) {
-      todayLines.push(`- [${repo.repoName}:${todo.branch}] ${todo.text}`);
-    }
+    const repoInProgress: string[] = repo.openTodos.map((todo) => `- Next: ${todo.text}`);
     if (repo.dirtyFilePaths.length > 0) {
-      todayLines.push(
-        `- [${repo.repoName}:${repo.currentBranch}] Active WIP (${repo.dirtyFilePaths.length} modified/untracked files)`,
+      const count = repo.dirtyFilePaths.length;
+      repoInProgress.push(
+        `- Uncommitted changes in progress (${count} file${count === 1 ? "" : "s"})`,
       );
     }
+    if (repoInProgress.length > 0) {
+      inProgressSections.push(
+        `${h3(`${repo.repoName} (\`${repo.currentBranch}\`)`)}\n${repoInProgress.join("\n")}`,
+      );
+    }
+
     for (const note of repo.branchNotes) {
       const linkSuffix = note.link ? ` (${note.link})` : "";
-      todayLines.push(`- [${repo.repoName}:${note.branch}] Note: ${note.content}${linkSuffix}`);
+      noteLines.push(
+        `- ${bold(repo.repoName)} (\`${note.branch}\`): ${note.content}${linkSuffix}`,
+      );
     }
   }
 
-  const sections = [
-    `${h("Yesterday / Completed")} (${payload.sinceLabel})`,
-    yesterdayLines.length > 0 ? yesterdayLines.join("\n") : "- No recorded commits or completed TODOs.",
+  const lines: string[] = [
+    `${h2(`Completed (${payload.sinceLabel})`)}`,
+    completedSections.length > 0
+      ? completedSections.join("\n\n")
+      : "- No completed commits or tasks recorded.",
     "",
-    h("Today / In Progress"),
-    todayLines.length > 0 ? todayLines.join("\n") : "- No open branch TODOs or active WIP.",
+    h2("In Progress / Today"),
+    inProgressSections.length > 0
+      ? inProgressSections.join("\n\n")
+      : "- No open tasks or active working-tree edits.",
   ];
 
-  return sections.join("\n");
+  if (noteLines.length > 0) {
+    lines.push("", h2("Notes & Blockers"), noteLines.join("\n"));
+  }
+
+  return lines.join("\n");
 }
 
 function buildStandupPrompt(payload: StandupPayload, format: StandupFormat): string {
   const formatHint =
     format === "slack"
-      ? "Use Slack-friendly formatting (*Bold Headers* and concise `-` bullets, no # markdown headings)."
-      : "Use clean Markdown (## Yesterday, ## Today, ## Blockers / Notes if applicable).";
+      ? "Use Slack formatting (*Section Headers* and concise `-` bullets, no `#` headings)."
+      : "Use clean Markdown with `## Completed`, `## In Progress / Today`, and `## Notes & Blockers` (only include Notes & Blockers when notes exist).";
 
   return [
-    `Generate a concise daily engineering standup update (${payload.sinceLabel}).`,
+    `Write a natural, human-readable engineering standup update (${payload.sinceLabel}) suitable for pasting directly to teammates.`,
     formatHint,
-    "Rules:",
-    "- Group logically by repo or initiative when helpful.",
-    "- Include Yesterday (from commits and completed TODOs) and Today (from open branch TODOs, notes, and active WIP).",
-    "- Omit Blockers unless a note explicitly mentions being blocked.",
-    "- Be crisp and concrete. Do NOT invent changes or details not present in the JSON metadata.",
+    "Style guidelines:",
+    "- Write in clear plain English, not raw git log dumps.",
+    "- Group updates under each repository name and synthesize related commits into 1-4 concise outcome bullets.",
+    "- NEVER include commit SHA hashes, raw conventional-commit prefixes like `feat(scope):`, or raw file-path lists unless a specific filename clarifies the change.",
+    "- Under Completed: summarize shipped commits and completed tasks.",
+    "- Under In Progress / Today: summarize open tasks and active uncommitted work.",
+    "- Strict honesty: only state facts present in the provided metadata; never invent work or blockers.",
     "",
-    "Metadata (strictly commit subjects, file paths, and developer notes — no source diffs):",
+    "Metadata:",
     JSON.stringify(payload, null, 2),
   ].join("\n");
+}
+
+async function runConfiguredLlm(
+  llm: LlmSettings,
+  systemInstruction: string,
+  prompt: string,
+  fallbackTarget: "summary" | "PR draft",
+  injectedCaller?: GeminiCaller,
+): Promise<
+  | { ok: true; text: string }
+  | { ok: false; warning: string }
+> {
+  if (!llm.isConfigured) {
+    return {
+      ok: false,
+      warning: `${llm.envVar} is not set for ${llm.providerLabel}. Showing structured offline ${fallbackTarget}. Configure it in Settings or run \`ctx config set apiKey <key>\`.`,
+    };
+  }
+
+  const res = injectedCaller
+    ? await injectedCaller({
+        apiKey: llm.apiKey ?? "",
+        model: llm.model,
+        baseUrl: llm.baseUrl,
+        systemInstruction,
+        prompt,
+      })
+    : await callLlm({
+        provider: llm.provider,
+        apiKey: llm.apiKey,
+        model: llm.model,
+        baseUrl: llm.baseUrl,
+        systemInstruction,
+        prompt,
+      });
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      warning: `${res.error} Showing structured offline ${fallbackTarget}.`,
+    };
+  }
+  return { ok: true, text: res.text };
 }
 
 export async function generateStandupSummary(
@@ -256,6 +343,8 @@ export async function generateStandupSummary(
     repoIds?: number[];
     format?: StandupFormat;
     raw?: boolean;
+    provider?: LlmProvider;
+    model?: string;
     config?: CtxConfig;
     geminiCaller?: GeminiCaller;
   } = {},
@@ -268,48 +357,41 @@ export async function generateStandupSummary(
     repoIds: options.repoIds,
   });
 
-  if (options.raw) {
+  if (options.raw || payload.repos.length === 0) {
     return { mode: "raw", markdown: formatStandupFallback(payload, format), payload };
   }
 
-  if (payload.repos.length === 0) {
-    return {
-      mode: "raw",
-      markdown: formatStandupFallback(payload, format),
-      payload,
-    };
-  }
-
-  const gemini = resolveGeminiSettings(config);
-  if (!gemini.apiKey) {
-    return {
-      mode: "fallback",
-      warning:
-        "GEMINI_API_KEY is not set. Showing structured offline summary. Set GEMINI_API_KEY or run `ctx config set geminiKey <key>`.",
-      markdown: formatStandupFallback(payload, format),
-      payload,
-    };
-  }
-
-  const caller = options.geminiCaller ?? callGemini;
-  const result = await caller({
-    apiKey: gemini.apiKey,
-    model: gemini.model,
-    systemInstruction:
-      "You are a pragmatic senior software engineer writing a clear, honest daily standup from git commit metadata and branch notes. Never fabricate facts.",
-    prompt: buildStandupPrompt(payload, format),
+  const llm = resolveLlmSettings(config, {
+    provider: options.provider,
+    model: options.model,
   });
 
-  if (!result.ok) {
+  const modelOut = await runConfiguredLlm(
+    llm,
+    "You are a senior software engineer writing a clear, natural daily standup for teammates from git activity and branch notes. Keep prose concise and never invent facts.",
+    buildStandupPrompt(payload, format),
+    "summary",
+    options.geminiCaller,
+  );
+
+  if (!modelOut.ok) {
     return {
       mode: "fallback",
-      warning: `${result.error} Falling back to structured offline summary.`,
+      provider: llm.provider,
+      model: llm.model,
+      warning: modelOut.warning,
       markdown: formatStandupFallback(payload, format),
       payload,
     };
   }
 
-  return { mode: "gemini", markdown: result.text, payload };
+  return {
+    mode: "gemini",
+    provider: llm.provider,
+    model: llm.model,
+    markdown: modelOut.text,
+    payload,
+  };
 }
 
 export async function collectPrPayload(
@@ -338,38 +420,55 @@ export async function collectPrPayload(
 }
 
 export function formatPrFallback(payload: PrPayload): string {
+  const title =
+    payload.commits.length === 1
+      ? humanizeCommitSubject(payload.commits[0]!.subject)
+      : humanizeCommitSubject(payload.branch.replace(/[-_/]+/g, " "));
+
+  const totalAdded = payload.files.reduce((sum, f) => sum + (f.added ?? 0), 0);
+  const totalDeleted = payload.files.reduce((sum, f) => sum + (f.deleted ?? 0), 0);
+  const diffStats = totalAdded + totalDeleted > 0 ? ` (+${totalAdded}/-${totalDeleted} lines)` : "";
+
   const lines: string[] = [
-    `# PR: ${payload.branch} -> ${payload.baseBranch} (${payload.repoName})`,
+    `# ${title}`,
+    "",
+    "## Summary",
+    `Merges \`${payload.branch}\` into \`${payload.baseBranch}\` in **${payload.repoName}** (${payload.commits.length} commit${payload.commits.length === 1 ? "" : "s"}, ${payload.files.length} file${payload.files.length === 1 ? "" : "s"}${diffStats}).`,
   ];
+
   if (payload.ticketLink) {
-    lines.push(`Link: ${payload.ticketLink}`);
+    lines.push("", `Reference: ${payload.ticketLink}`);
   }
-  lines.push("", "## Commits");
-  if (payload.commits.length === 0) {
-    lines.push("- No commits ahead of base branch.");
-  } else {
-    for (const c of payload.commits) {
-      lines.push(`- ${c.subject} (\`${c.shortHash}\`)`);
-    }
+  if (payload.notes.length > 0) {
+    lines.push("", ...payload.notes.map((n) => `- ${n.content}`));
   }
 
-  lines.push("", "## Changed Files");
+  lines.push("", "## Key Changes");
+  const seenSubjects = new Set<string>();
+  const readableChanges: string[] = [];
+  for (const c of payload.commits) {
+    const clean = humanizeCommitSubject(c.subject);
+    const key = clean.toLowerCase();
+    if (!clean || seenSubjects.has(key)) continue;
+    seenSubjects.add(key);
+    readableChanges.push(`- ${clean}`);
+  }
+  if (readableChanges.length === 0) {
+    lines.push("- No commits ahead of the base branch.");
+  } else {
+    lines.push(...readableChanges);
+  }
+
+  lines.push("", "## Files Touched");
   if (payload.files.length === 0) {
     lines.push("- None");
   } else {
-    for (const f of payload.files.slice(0, 40)) {
+    for (const f of payload.files.slice(0, 30)) {
       const stat = f.added !== null && f.deleted !== null ? ` (+${f.added}/-${f.deleted})` : "";
       lines.push(`- \`${f.path}\`${stat}`);
     }
-    if (payload.files.length > 40) {
-      lines.push(`- ...and ${payload.files.length - 40} more files`);
-    }
-  }
-
-  if (payload.notes.length > 0) {
-    lines.push("", "## Branch Notes");
-    for (const n of payload.notes) {
-      lines.push(`- ${n.content}`);
+    if (payload.files.length > 30) {
+      lines.push(`- ...and ${payload.files.length - 30} more files`);
     }
   }
 
@@ -385,16 +484,16 @@ export function formatPrFallback(payload: PrPayload): string {
 
 function buildPrPrompt(payload: PrPayload): string {
   return [
-    `Draft a concise, high-signal Pull Request description for branch \`${payload.branch}\` targeting \`${payload.baseBranch}\` in repo \`${payload.repoName}\`.`,
+    `Draft a clear, human-readable Pull Request description for branch \`${payload.branch}\` targeting \`${payload.baseBranch}\` in repo \`${payload.repoName}\`.`,
     "Include:",
-    "1. A suggested PR Title (single line)",
-    "2. ## Summary (2-4 crisp sentences or bullets)",
-    "3. ## Key Changes (grouped logically from commit messages & file paths)",
-    "4. ## Checklist (incorporating branch TODOs if present, plus any ticket link)",
+    "1. Suggested PR title (`# Title`) in plain, outcome-focused language",
+    "2. `## Summary` (2-3 plain-English sentences explaining the change and context)",
+    "3. `## Key Changes` (synthesized bullets grouped logically — avoid echoing commit SHAs or conventional prefixes)",
+    "4. `## Checklist` (from branch TODOs if present, plus any ticket link)",
     "Rules:",
-    "- Strictly rely on the provided metadata. Do NOT fabricate implementation details or test claims not mentioned in the commits or notes.",
+    "- Strictly rely on the provided metadata. Do NOT fabricate implementation details or test results.",
     "",
-    "Metadata (commit subjects, file paths with line counts only, branch notes/TODOs — no source code):",
+    "Metadata:",
     JSON.stringify(payload, null, 2),
   ].join("\n");
 }
@@ -406,6 +505,8 @@ export async function generatePrSummary(
     baseBranch?: string;
     branch?: string;
     raw?: boolean;
+    provider?: LlmProvider;
+    model?: string;
     config?: CtxConfig;
     geminiCaller?: GeminiCaller;
   } = {},
@@ -425,33 +526,26 @@ export async function generatePrSummary(
   }
 
   const config = options.config ?? loadConfig();
-  const gemini = resolveGeminiSettings(config);
-  if (!gemini.apiKey) {
-    return {
-      result: {
-        mode: "fallback",
-        warning:
-          "GEMINI_API_KEY is not set. Showing structured offline PR draft. Set GEMINI_API_KEY or run `ctx config set geminiKey <key>`.",
-        markdown: formatPrFallback(payload),
-        payload,
-      },
-    };
-  }
-
-  const caller = options.geminiCaller ?? callGemini;
-  const res = await caller({
-    apiKey: gemini.apiKey,
-    model: gemini.model,
-    systemInstruction:
-      "You are a senior software engineer drafting an accurate, concise Pull Request description strictly from commit subjects, file change stats, and developer notes. Never invent details.",
-    prompt: buildPrPrompt(payload),
+  const llm = resolveLlmSettings(config, {
+    provider: options.provider,
+    model: options.model,
   });
 
-  if (!res.ok) {
+  const modelOut = await runConfiguredLlm(
+    llm,
+    "You are a senior software engineer drafting a crisp, reviewer-friendly Pull Request description from commit history, file stats, and developer notes. Never invent facts.",
+    buildPrPrompt(payload),
+    "PR draft",
+    options.geminiCaller,
+  );
+
+  if (!modelOut.ok) {
     return {
       result: {
         mode: "fallback",
-        warning: `${res.error} Falling back to structured offline PR draft.`,
+        provider: llm.provider,
+        model: llm.model,
+        warning: modelOut.warning,
         markdown: formatPrFallback(payload),
         payload,
       },
@@ -459,6 +553,12 @@ export async function generatePrSummary(
   }
 
   return {
-    result: { mode: "gemini", markdown: res.text, payload },
+    result: {
+      mode: "gemini",
+      provider: llm.provider,
+      model: llm.model,
+      markdown: modelOut.text,
+      payload,
+    },
   };
 }

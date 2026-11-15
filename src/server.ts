@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { loadConfig, redactConfig, saveConfig, type StandupFormat } from "./config.ts";
+import {
+  isLlmProvider,
+  loadConfig,
+  type LlmProvider,
+  redactConfig,
+  saveConfig,
+  type StandupFormat,
+} from "./config.ts";
 import type { CtxStore } from "./db.ts";
 import {
   fetchRepo,
@@ -257,13 +264,18 @@ export function startUiServer(options: ServerOptions) {
           repoIds?: number[];
           format?: StandupFormat;
           raw?: boolean;
+          provider?: string;
+          model?: string;
         }>(req);
+        const provider = body?.provider && isLlmProvider(body.provider) ? body.provider : undefined;
         const result = await generateStandupSummary(store, {
           since: body?.since,
           allAuthors: body?.allAuthors,
           repoIds: body?.repoIds,
           format: body?.format,
           raw: body?.raw,
+          provider,
+          model: body?.model,
           geminiCaller,
         });
         return json(result);
@@ -276,14 +288,19 @@ export function startUiServer(options: ServerOptions) {
           baseBranch?: string;
           branch?: string;
           raw?: boolean;
+          provider?: string;
+          model?: string;
         }>(req);
         if (!body?.repoId) return badRequest("repoId is required");
         const repo = store.getRepoById(body.repoId);
         if (!repo) return badRequest("Repository not found", 404);
+        const provider = body?.provider && isLlmProvider(body.provider) ? body.provider : undefined;
         const out = await generatePrSummary(store, repo, {
           baseBranch: body.baseBranch,
           branch: body.branch,
           raw: body.raw,
+          provider,
+          model: body.model,
           geminiCaller,
         });
         if (!out.result) return badRequest(out.error || "Failed to generate PR description");
@@ -323,16 +340,76 @@ export function startUiServer(options: ServerOptions) {
           clearGeminiKey?: boolean;
           geminiModel?: string;
           standupFormat?: StandupFormat;
+          llmProvider?: LlmProvider;
+          llmModel?: string;
+          llmApiKey?: string;
+          clearApiKey?: boolean;
+          llmBaseUrl?: string;
+          clearBaseUrl?: boolean;
         }>(req);
         const current = loadConfig();
-        if (body?.clearGeminiKey) {
-          current.geminiKey = undefined;
-        } else if (body?.geminiKey?.trim()) {
-          current.geminiKey = body.geminiKey.trim();
+        const prevProvider = current.llmProvider ?? "gemini";
+
+        if (body?.llmProvider !== undefined) {
+          if (!isLlmProvider(body.llmProvider)) {
+            return badRequest("Unsupported llmProvider");
+          }
+          current.llmProvider = body.llmProvider;
+          if (body.llmProvider !== prevProvider) {
+            current.llmModel = undefined;
+            current.llmBaseUrl = undefined;
+            if (!body.llmApiKey && !body.clearApiKey) {
+              current.llmApiKey = undefined;
+            }
+          }
+        }
+
+        const activeProvider = current.llmProvider ?? "gemini";
+
+        if (body?.clearApiKey || body?.clearGeminiKey) {
+          current.llmApiKey = undefined;
+          if (activeProvider === "gemini" || body.clearGeminiKey) {
+            current.geminiKey = undefined;
+          }
+        } else {
+          if (body?.llmApiKey?.trim()) {
+            current.llmApiKey = body.llmApiKey.trim();
+            if (activeProvider === "gemini") {
+              current.geminiKey = body.llmApiKey.trim();
+            }
+          }
+          if (body?.geminiKey?.trim()) {
+            current.geminiKey = body.geminiKey.trim();
+            if (activeProvider === "gemini") {
+              current.llmApiKey = body.geminiKey.trim();
+            }
+          }
+        }
+
+        if (body?.llmModel !== undefined) {
+          const trimmed = body.llmModel.trim();
+          current.llmModel = trimmed || undefined;
+          if (activeProvider === "gemini" && trimmed) {
+            current.geminiModel = trimmed;
+          }
         }
         if (body?.geminiModel?.trim()) {
           current.geminiModel = body.geminiModel.trim();
+          if (activeProvider === "gemini" && body.llmModel === undefined) {
+            current.llmModel = body.geminiModel.trim();
+          }
         }
+
+        if (body?.clearBaseUrl) {
+          current.llmBaseUrl = undefined;
+        } else if (body?.llmBaseUrl !== undefined) {
+          const rawUrl = body.llmBaseUrl.trim().replace(/\/+$/, "");
+          if (rawUrl && !/^https?:\/\//i.test(rawUrl)) {
+            return badRequest("Base URL must start with http:// or https://");
+          }
+          current.llmBaseUrl = rawUrl || undefined;
+        }
+
         if (body?.standupFormat === "markdown" || body?.standupFormat === "slack") {
           current.standupFormat = body.standupFormat;
         }

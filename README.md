@@ -1,6 +1,6 @@
 # ctx
 
-Local Git multi-repo cockpit, branch-tied context memory, and metadata-only Gemini standup & PR summarizer.
+Local Git multi-repo cockpit, branch-tied context memory, and metadata-only AI standup & PR summarizer.
 
 ## What It Does
 
@@ -8,7 +8,7 @@ Local Git multi-repo cockpit, branch-tied context memory, and metadata-only Gemi
 - **Branch-tied notes, TODOs & links**: Store notes, checkable TODOs, and PR/ticket URLs in a central local SQLite database (`%LOCALAPPDATA%\ctx\ctx.db` on Windows) so your repositories stay completely clean. Worktrees of the same repo automatically share branch context.
 - **Cross-repo search & activity (`ctx search`, `ctx activity`)**: Search across branch notes, TODOs, PR/ticket links, and commit subjects in one query, or view a cross-repo timeline and contribution pulse in both the terminal and the **Activity & Search** tab in `ctx ui`.
 - **Opt-in branch recall (`ctx hook install`)**: Installs a safe `post-checkout` hook (preserving any existing hook script) that records branch visits and prints your saved notes & open TODOs when switching branches in your terminal.
-- **Metadata-only Gemini summaries (`ctx standup`, `ctx pr`)**: Summarizes your daily standup (smart last-workday window, filtered to your `git config user.email` by default) or drafts a PR description. **Only commit subjects, changed file paths/line counts, and your notes/TODOs are sent to Gemini — never source code diffs.** Falls back cleanly to structured offline Markdown if `GEMINI_API_KEY` is missing or unreachable.
+- **Metadata-only AI summaries (`ctx standup`, `ctx pr`)**: Generates human-readable daily standups and PR drafts using any configured LLM provider (`gemini`, `openai`, `anthropic`, `groq`, `openrouter`, `ollama`, or `custom` OpenAI-compatible endpoints). **Only commit subjects, changed file paths/line counts, and your notes/TODOs are sent — never source code diffs.** Falls back cleanly to structured offline Markdown if no API key is set.
 
 ## Quick Start
 
@@ -34,13 +34,21 @@ ctx ui                    # launch local dashboard at http://127.0.0.1:4312
 
 ## Configuration
 
-Set `GEMINI_API_KEY` in your environment, or configure locally:
+Set your provider's API key in the environment (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`), or configure any LLM locally (including local Ollama with no key needed):
 
 ```powershell
-ctx config set geminiKey YOUR_API_KEY
-ctx config set geminiModel gemini-2.5-flash
+# Example: OpenAI / Anthropic / Groq / OpenRouter / Gemini
+ctx config set provider openai
+ctx config set model gpt-4o-mini
+ctx config set apiKey YOUR_API_KEY
+
+# Example: Local Ollama or custom OpenAI-compatible server
+ctx config set provider ollama
+ctx config set model llama3.2
+ctx config set baseUrl http://127.0.0.1:11434/v1
+
 ctx config set standupFormat markdown   # or slack
-ctx config show                         # key is always redacted
+ctx config show                         # API key is always redacted
 ```
 
 ## Development

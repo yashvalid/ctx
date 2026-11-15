@@ -172,6 +172,28 @@ describe("UI HTTP Server", () => {
         commitHits: Array<{ subject: string }>;
       };
       expect(commitSearchJson.commitHits.some((c) => c.subject.includes("chore: initial"))).toBe(true);
+
+      // Switching LLM provider via /api/config stores non-Gemini settings safely and redacts secrets
+      const providerPut = await fetch(`${baseUrl}/api/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          llmProvider: "openai",
+          llmModel: "gpt-4o-mini",
+          llmApiKey: "sk-super-secret-openai",
+        }),
+      });
+      expect(providerPut.status).toBe(200);
+      const providerBody = await providerPut.text();
+      expect(providerBody).not.toContain("sk-super-secret-openai");
+      const providerJson = JSON.parse(providerBody) as {
+        llmProvider: string;
+        llmModel: string;
+        hasApiKey: boolean;
+      };
+      expect(providerJson.llmProvider).toBe("openai");
+      expect(providerJson.llmModel).toBe("gpt-4o-mini");
+      expect(providerJson.hasApiKey).toBe(true);
     } finally {
       server.stop(true);
       store.close();

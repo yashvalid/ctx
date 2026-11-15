@@ -2,13 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { resolveLlmSettings } from "../src/config.ts";
 import { CtxStore } from "../src/db.ts";
-import { callGemini } from "../src/gemini.ts";
+import { callGemini, callLlm } from "../src/gemini.ts";
 import { resolveRepoInfo, runGit } from "../src/git.ts";
 import {
   computeDefaultSince,
   generatePrSummary,
   generateStandupSummary,
+  humanizeCommitSubject,
   parseSinceInput,
 } from "../src/summary.ts";
 
@@ -65,7 +67,7 @@ afterEach(() => {
   else process.env.CTX_HOME = originalCtxHome;
 
   while (tempDirs.length > 0) {
-    fs.rmSync(tempDirs.pop()!, { recursive: true, force: true });
+    fs.rmSync(tempDirs.pop()!, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 
@@ -138,13 +140,16 @@ describe("summary & gemini", () => {
       store.addTodo(info.commonDir, "feat/retries", "Add jitter unit test");
       store.setBranchLink(info.commonDir, "feat/retries", "https://github.com/org/pay/pull/99");
 
-      // Without API key -> offline fallback
+      // Without API key -> readable offline fallback (strips conventional prefixes & SHAs)
       const offline = await generateStandupSummary(store, { since: "2d" });
       expect(offline.mode).toBe("fallback");
       expect(offline.warning).toContain("GEMINI_API_KEY");
-      expect(offline.markdown).toContain("add exponential backoff retries");
+      expect(offline.markdown).toContain("### payments-api");
+      expect(offline.markdown).toContain("- Add exponential backoff retries");
+      expect(offline.markdown).not.toContain("feat: add exponential backoff retries");
       expect(offline.markdown).not.toContain("bob unrelated task");
       expect(offline.markdown).toContain("Add jitter unit test");
+      expect(offline.markdown).toContain("## Notes & Blockers");
 
       // Strict metadata-only check on Gemini prompt!
       let capturedPrompt = "";
@@ -189,4 +194,91 @@ describe("summary & gemini", () => {
       store.close();
     }
   }, 15000);
+
+  test("humanizeCommitSubject cleans conventional commit prefixes and callLlm supports OpenAI, Anthropic, and Ollama", async () => {
+    expect(humanizeCommitSubject("feat(ui): add dark theme.")).toBe("Add dark theme");
+    expect(humanizeCommitSubject("fix!: handle 429 retry-after")).toBe("Handle 429 retry-after");
+    expect(humanizeCommitSubject("Refactor token cache")).toBe("Refactor token cache");
+
+    // Provider isolation + key-optional local Ollama
+    const openaiCfg = resolveLlmSettings({
+      geminiModel: "gemini-2.5-flash",
+      standupFormat: "markdown",
+      llmProvider: "openai",
+      llmModel: "gpt-4o-mini",
+      llmApiKey: "sk-openai-only",
+    });
+    expect(openaiCfg.provider).toBe("openai");
+    expect(openaiCfg.model).toBe("gpt-4o-mini");
+    expect(openaiCfg.apiKey).toBe("sk-openai-only");
+
+    const switchedToGemini = resolveLlmSettings(
+      {
+        geminiModel: "gemini-2.5-flash",
+        standupFormat: "markdown",
+        llmProvider: "openai",
+        llmApiKey: "sk-openai-only",
+      },
+      { provider: "gemini" },
+    );
+    expect(switchedToGemini.apiKey).toBeUndefined();
+
+    const ollamaCfg = resolveLlmSettings({
+      geminiModel: "gemini-2.5-flash",
+      standupFormat: "markdown",
+      llmProvider: "ollama",
+      llmModel: "llama3.2",
+    });
+    expect(ollamaCfg.isConfigured).toBe(true);
+    expect(ollamaCfg.baseUrl).toBe("http://127.0.0.1:11434/v1");
+
+    // OpenAI-compatible HTTP call
+    let openAiUrl = "";
+    let openAiAuth = "";
+    const openAiRes = await callLlm({
+      provider: "openai",
+      apiKey: "sk-test",
+      model: "gpt-4o-mini",
+      systemInstruction: "Be clear",
+      prompt: "Standup please",
+      fetchImpl: (async (url: string | URL | Request, init?: RequestInit) => {
+        openAiUrl = String(url);
+        openAiAuth = new Headers(init?.headers).get("Authorization") ?? "";
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: "## Completed\n- Shipped retry backoff" } }] }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }) as unknown as typeof fetch,
+    });
+    expect(openAiRes.ok).toBe(true);
+    expect(openAiUrl).toBe("https://api.openai.com/v1/chat/completions");
+    expect(openAiAuth).toBe("Bearer sk-test");
+
+    // Anthropic Messages API HTTP call
+    let antUrl = "";
+    let antKey = "";
+    let antVer = "";
+    const antRes = await callLlm({
+      provider: "anthropic",
+      apiKey: "sk-ant-test",
+      model: "claude-sonnet-4-20250514",
+      systemInstruction: "Be clear",
+      prompt: "PR please",
+      fetchImpl: (async (url: string | URL | Request, init?: RequestInit) => {
+        antUrl = String(url);
+        const headers = new Headers(init?.headers);
+        antKey = headers.get("x-api-key") ?? "";
+        antVer = headers.get("anthropic-version") ?? "";
+        return new Response(
+          JSON.stringify({ content: [{ type: "text", text: "## Summary\nImproves retry resilience." }] }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }) as unknown as typeof fetch,
+    });
+    expect(antRes.ok).toBe(true);
+    if (antRes.ok) expect(antRes.text).toContain("Improves retry resilience");
+    expect(antUrl).toBe("https://api.anthropic.com/v1/messages");
+    expect(antKey).toBe("sk-ant-test");
+    expect(antVer).toBe("2023-06-01");
+  });
 });

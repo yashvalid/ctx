@@ -957,7 +957,7 @@
             </div>
 
             <div class="small muted" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-muted);">
-              Metadata-only: only commit subjects, file paths, and your notes/tasks are sent to Gemini.
+              Metadata-only: only commit subjects, file paths, and your notes/tasks are sent to your configured LLM.
             </div>
           </div>
         </div>
@@ -1076,15 +1076,31 @@
         <div id="keyStatusBanner" class="flash flash-info"></div>
 
         <div class="field">
-          <label for="cfgGeminiKey">Gemini API key (leave blank to keep existing or use GEMINI_API_KEY)</label>
+          <label for="cfgLlmProvider">LLM Provider</label>
+          <select id="cfgLlmProvider" class="form-control">
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="groq">Groq</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="ollama">Ollama (Local)</option>
+            <option value="custom">Custom (OpenAI-compatible)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="cfgApiKeyLabel" for="cfgLlmApiKey">API key (leave blank to keep existing or use env var)</label>
           <div style="display:flex;gap:8px;">
-            <input id="cfgGeminiKey" class="form-control" type="password" placeholder="AIza..." style="flex:1;" />
+            <input id="cfgLlmApiKey" class="form-control" type="password" placeholder="API key..." style="flex:1;" />
             <button id="clearSavedKeyBtn" class="btn btn-sm btn-danger">Clear</button>
           </div>
         </div>
         <div class="field">
-          <label for="cfgGeminiModel">Model</label>
-          <input id="cfgGeminiModel" class="form-control" type="text" placeholder="gemini-2.5-flash" />
+          <label for="cfgLlmModel">Model</label>
+          <input id="cfgLlmModel" class="form-control" type="text" placeholder="gemini-2.5-flash" />
+        </div>
+        <div class="field">
+          <label for="cfgLlmBaseUrl">Base URL (optional — override for Ollama / proxies / custom gateways)</label>
+          <input id="cfgLlmBaseUrl" class="form-control" type="text" placeholder="https://generativelanguage.googleapis.com/v1beta" />
         </div>
         <div class="field">
           <label for="cfgStandupFormat">Default standup format</label>
@@ -1119,6 +1135,7 @@
       editingLink: false,
       activeTab: "cockpit",
       activityLoaded: false,
+      providers: [],
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1637,18 +1654,59 @@
       }
     }
 
+    function updateProviderFieldHints(providerId, resetInputs = false) {
+      const info = state.providers.find((p) => p.id === providerId);
+      if (!info) return;
+      $("cfgApiKeyLabel").textContent = info.requiresKey
+        ? `${info.label} API key (leave blank to keep saved, or set ${info.envVar})`
+        : `API key (optional for ${info.label}, or set ${info.envVar})`;
+      $("cfgLlmModel").placeholder = info.defaultModel;
+      $("cfgLlmBaseUrl").placeholder = info.defaultBaseUrl;
+      $("cfgLlmApiKey").placeholder =
+        providerId === "gemini"
+          ? "AIza..."
+          : providerId === "openai"
+            ? "sk-..."
+            : providerId === "anthropic"
+              ? "sk-ant-..."
+              : "Optional or provider API key";
+      if (resetInputs) {
+        $("cfgLlmModel").value = info.defaultModel;
+        $("cfgLlmBaseUrl").value = "";
+      }
+    }
+
     async function loadSettings() {
       const [cfg, watchData] = await Promise.all([api("/api/config"), api("/api/watch")]);
-      $("cfgGeminiModel").value = cfg.geminiModel;
+      if (Array.isArray(cfg.providers) && cfg.providers.length > 0) {
+        state.providers = cfg.providers;
+        const sel = $("cfgLlmProvider");
+        sel.innerHTML = "";
+        for (const p of cfg.providers) {
+          sel.appendChild(el("option", { value: p.id, text: p.label }));
+        }
+      }
+
+      const providerId = cfg.llmProvider || "gemini";
+      $("cfgLlmProvider").value = providerId;
+      updateProviderFieldHints(providerId, false);
+      $("cfgLlmModel").value = cfg.llmModel || cfg.geminiModel || "";
+      const activeInfo = state.providers.find((p) => p.id === providerId);
+      $("cfgLlmBaseUrl").value =
+        activeInfo && cfg.llmBaseUrl && cfg.llmBaseUrl !== activeInfo.defaultBaseUrl
+          ? cfg.llmBaseUrl
+          : "";
       $("cfgStandupFormat").value = cfg.standupFormat;
       $("standupFormat").value = cfg.standupFormat;
-      $("cfgGeminiKey").value = "";
+      $("cfgLlmApiKey").value = "";
 
       const banner = $("keyStatusBanner");
-      if (cfg.hasGeminiKey) {
-        banner.textContent = `Gemini key active via ${cfg.keySource === "env" ? "GEMINI_API_KEY env" : "local config"}.`;
+      if (cfg.hasApiKey) {
+        banner.textContent = `${cfg.llmProviderLabel} (${cfg.llmModel}) active via ${cfg.keySource === "env" ? cfg.envVarHint + " env" : "local config"}.`;
+      } else if (cfg.isLlmConfigured) {
+        banner.textContent = `${cfg.llmProviderLabel} (${cfg.llmModel}) ready via ${cfg.llmBaseUrl}.`;
       } else {
-        banner.textContent = "No Gemini key set — summaries will use offline structured fallback.";
+        banner.textContent = `No ${cfg.llmProviderLabel} API key configured (set ${cfg.envVarHint} or paste key below) — summaries will use offline readable format.`;
       }
 
       const list = $("watchedDirsList");
@@ -1679,7 +1737,13 @@
       const label = $("studioModeLabel");
       label.style.display = "inline-flex";
       label.textContent =
-        res.mode === "gemini" ? "Gemini AI" : res.mode === "fallback" ? "Offline fallback" : "Raw metadata";
+        res.mode === "gemini"
+          ? res.provider
+            ? `${res.provider} · ${res.model || ""}`
+            : "AI summary"
+          : res.mode === "fallback"
+            ? "Offline summary"
+            : "Raw metadata";
       if (res.warning) {
         $("studioWarning").style.display = "block";
         $("studioWarning").textContent = res.warning;
@@ -2020,20 +2084,33 @@
       if (e.target === $("settingsModal")) $("settingsModal").classList.remove("open");
     });
 
+    $("cfgLlmProvider").addEventListener("change", () => {
+      updateProviderFieldHints($("cfgLlmProvider").value, true);
+    });
+
     $("saveConfigBtn").addEventListener("click", async () => {
+      const provider = $("cfgLlmProvider").value;
       const body = {
-        geminiModel: $("cfgGeminiModel").value.trim() || "gemini-2.5-flash",
+        llmProvider: provider,
+        llmModel: $("cfgLlmModel").value.trim(),
         standupFormat: $("cfgStandupFormat").value,
       };
-      const key = $("cfgGeminiKey").value.trim();
-      if (key) body.geminiKey = key;
-      await api("/api/config", { method: "PUT", body: JSON.stringify(body) });
-      await loadSettings();
-      notify("Settings saved");
+      const baseUrl = $("cfgLlmBaseUrl").value.trim();
+      if (baseUrl) body.llmBaseUrl = baseUrl;
+      else body.clearBaseUrl = true;
+      const key = $("cfgLlmApiKey").value.trim();
+      if (key) body.llmApiKey = key;
+      try {
+        await api("/api/config", { method: "PUT", body: JSON.stringify(body) });
+        await loadSettings();
+        notify("Settings saved");
+      } catch (err) {
+        notify(err.message, true);
+      }
     });
 
     $("clearSavedKeyBtn").addEventListener("click", async () => {
-      await api("/api/config", { method: "PUT", body: JSON.stringify({ clearGeminiKey: true }) });
+      await api("/api/config", { method: "PUT", body: JSON.stringify({ clearApiKey: true, clearGeminiKey: true }) });
       await loadSettings();
       notify("Saved API key cleared");
     });

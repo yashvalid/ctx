@@ -304,10 +304,10 @@ export function formatHelp(): string {
     "  ctx activity [--since 14d] [--all-authors] [--json]",
     "                            Show cross-repo commit and context activity timeline (alias: log)",
     "",
-    paint.bold("AI Summaries (metadata-only via Gemini):"),
-    "  ctx standup [--since 2d] [--all-authors] [--format slack|markdown] [--raw] [--copy]",
+    paint.bold("AI Summaries (metadata-only, configurable LLM provider):"),
+    "  ctx standup [--since 2d] [--all-authors] [--format slack|markdown] [--provider <name>] [--model <id>] [--raw] [--copy]",
     "                            Generate daily standup from commit metadata + branch TODOs",
-    "  ctx pr [--base main] [--raw] [--copy]",
+    "  ctx pr [--base main] [--provider <name>] [--model <id>] [--raw] [--copy]",
     "                            Draft a PR title, summary, and checklist for the current branch",
     "",
     paint.bold("Workspace, Hooks & UI:"),
@@ -320,6 +320,7 @@ export function formatHelp(): string {
     "  ctx hook [install|uninstall|status]",
     "                            Manage opt-in post-checkout hook for branch recall",
     "  ctx config [set <key> <val> | unset <key>]",
-    "                            Configure geminiKey, geminiModel, standupFormat",
+    "                            Configure provider (gemini|openai|anthropic|groq|openrouter|ollama|custom),",
+    "                            model, apiKey, baseUrl, standupFormat",
   ].join("\n");
 }

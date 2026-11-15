@@ -4,10 +4,95 @@ import path from "node:path";
 
 export type StandupFormat = "markdown" | "slack";
 
+export type LlmProvider =
+  | "gemini"
+  | "openai"
+  | "anthropic"
+  | "groq"
+  | "openrouter"
+  | "ollama"
+  | "custom";
+
+export interface LlmProviderInfo {
+  id: LlmProvider;
+  label: string;
+  defaultModel: string;
+  defaultBaseUrl: string;
+  envVar: string;
+  requiresKey: boolean;
+}
+
+export const LLM_PROVIDERS: Record<LlmProvider, LlmProviderInfo> = {
+  gemini: {
+    id: "gemini",
+    label: "Google Gemini",
+    defaultModel: "gemini-2.5-flash",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    envVar: "GEMINI_API_KEY",
+    requiresKey: true,
+  },
+  openai: {
+    id: "openai",
+    label: "OpenAI",
+    defaultModel: "gpt-4o-mini",
+    defaultBaseUrl: "https://api.openai.com/v1",
+    envVar: "OPENAI_API_KEY",
+    requiresKey: true,
+  },
+  anthropic: {
+    id: "anthropic",
+    label: "Anthropic Claude",
+    defaultModel: "claude-sonnet-4-20250514",
+    defaultBaseUrl: "https://api.anthropic.com/v1",
+    envVar: "ANTHROPIC_API_KEY",
+    requiresKey: true,
+  },
+  groq: {
+    id: "groq",
+    label: "Groq",
+    defaultModel: "llama-3.3-70b-versatile",
+    defaultBaseUrl: "https://api.groq.com/openai/v1",
+    envVar: "GROQ_API_KEY",
+    requiresKey: true,
+  },
+  openrouter: {
+    id: "openrouter",
+    label: "OpenRouter",
+    defaultModel: "openai/gpt-4o-mini",
+    defaultBaseUrl: "https://openrouter.ai/api/v1",
+    envVar: "OPENROUTER_API_KEY",
+    requiresKey: true,
+  },
+  ollama: {
+    id: "ollama",
+    label: "Ollama (Local)",
+    defaultModel: "llama3.2",
+    defaultBaseUrl: "http://127.0.0.1:11434/v1",
+    envVar: "OLLAMA_API_KEY",
+    requiresKey: false,
+  },
+  custom: {
+    id: "custom",
+    label: "Custom (OpenAI-compatible)",
+    defaultModel: "gpt-4o-mini",
+    defaultBaseUrl: "http://127.0.0.1:11434/v1",
+    envVar: "CTX_LLM_API_KEY",
+    requiresKey: false,
+  },
+};
+
+export function isLlmProvider(value: unknown): value is LlmProvider {
+  return typeof value === "string" && Object.hasOwn(LLM_PROVIDERS, value);
+}
+
 export interface CtxConfig {
   geminiKey?: string;
   geminiModel: string;
   standupFormat: StandupFormat;
+  llmProvider?: LlmProvider;
+  llmModel?: string;
+  llmApiKey?: string;
+  llmBaseUrl?: string;
 }
 
 export interface RedactedConfig {
@@ -16,6 +101,14 @@ export interface RedactedConfig {
   geminiModel: string;
   standupFormat: StandupFormat;
   dataDir: string;
+  llmProvider: LlmProvider;
+  llmProviderLabel: string;
+  llmModel: string;
+  llmBaseUrl: string;
+  hasApiKey: boolean;
+  isLlmConfigured: boolean;
+  envVarHint: string;
+  providers: LlmProviderInfo[];
 }
 
 export interface GeminiSettings {
@@ -24,9 +117,22 @@ export interface GeminiSettings {
   model: string;
 }
 
+export interface LlmSettings {
+  provider: LlmProvider;
+  providerLabel: string;
+  model: string;
+  baseUrl: string;
+  apiKey: string | undefined;
+  source: "env" | "config" | "none";
+  envVar: string;
+  requiresKey: boolean;
+  isConfigured: boolean;
+}
+
 const DEFAULT_CONFIG: CtxConfig = {
   geminiModel: "gemini-2.5-flash",
   standupFormat: "markdown",
+  llmProvider: "gemini",
 };
 
 /** Resolve the application data directory, honoring CTX_HOME for isolated runs/tests. */
@@ -75,6 +181,10 @@ export function ensureDataDir(): string {
   return dir;
 }
 
+function nonEmpty(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 export function loadConfig(): CtxConfig {
   const file = getConfigPath();
   if (!fs.existsSync(file)) {
@@ -84,14 +194,13 @@ export function loadConfig(): CtxConfig {
     const raw = fs.readFileSync(file, "utf8");
     const parsed = JSON.parse(raw) as Partial<CtxConfig>;
     return {
-      geminiKey: typeof parsed.geminiKey === "string" && parsed.geminiKey.trim()
-        ? parsed.geminiKey.trim()
-        : undefined,
-      geminiModel:
-        typeof parsed.geminiModel === "string" && parsed.geminiModel.trim()
-          ? parsed.geminiModel.trim()
-          : DEFAULT_CONFIG.geminiModel,
+      geminiKey: nonEmpty(parsed.geminiKey),
+      geminiModel: nonEmpty(parsed.geminiModel) ?? DEFAULT_CONFIG.geminiModel,
       standupFormat: parsed.standupFormat === "slack" ? "slack" : "markdown",
+      llmProvider: isLlmProvider(parsed.llmProvider) ? parsed.llmProvider : "gemini",
+      llmModel: nonEmpty(parsed.llmModel),
+      llmApiKey: nonEmpty(parsed.llmApiKey),
+      llmBaseUrl: nonEmpty(parsed.llmBaseUrl),
     };
   } catch {
     return { ...DEFAULT_CONFIG };
@@ -103,37 +212,98 @@ export function saveConfig(next: CtxConfig): void {
   const payload: Record<string, string> = {
     geminiModel: next.geminiModel || DEFAULT_CONFIG.geminiModel,
     standupFormat: next.standupFormat === "slack" ? "slack" : "markdown",
+    llmProvider: next.llmProvider && isLlmProvider(next.llmProvider) ? next.llmProvider : "gemini",
   };
-  if (next.geminiKey?.trim()) {
-    payload.geminiKey = next.geminiKey.trim();
-  }
+  if (next.geminiKey?.trim()) payload.geminiKey = next.geminiKey.trim();
+  if (next.llmModel?.trim()) payload.llmModel = next.llmModel.trim();
+  if (next.llmApiKey?.trim()) payload.llmApiKey = next.llmApiKey.trim();
+  if (next.llmBaseUrl?.trim()) payload.llmBaseUrl = next.llmBaseUrl.trim();
   fs.writeFileSync(getConfigPath(), `${JSON.stringify(payload, null, 2)}\n`, {
     encoding: "utf8",
     mode: 0o600,
   });
 }
 
-export function resolveGeminiSettings(config: CtxConfig = loadConfig()): GeminiSettings {
-  const envKey = process.env.GEMINI_API_KEY?.trim();
-  const cfgKey = config.geminiKey?.trim();
-  const model = process.env.CTX_GEMINI_MODEL?.trim() || config.geminiModel || DEFAULT_CONFIG.geminiModel;
+export function resolveLlmSettings(
+  config: CtxConfig = loadConfig(),
+  overrides: { provider?: LlmProvider; model?: string; baseUrl?: string } = {},
+): LlmSettings {
+  const envProviderRaw = process.env.CTX_LLM_PROVIDER?.trim().toLowerCase();
+  const configuredProvider: LlmProvider = config.llmProvider && isLlmProvider(config.llmProvider)
+    ? config.llmProvider
+    : "gemini";
+  const provider: LlmProvider =
+    overrides.provider ??
+    (isLlmProvider(envProviderRaw) ? envProviderRaw : undefined) ??
+    configuredProvider;
 
-  if (envKey) {
-    return { apiKey: envKey, source: "env", model };
-  }
-  if (cfgKey) {
-    return { apiKey: cfgKey, source: "config", model };
-  }
-  return { apiKey: undefined, source: "none", model };
+  const info = LLM_PROVIDERS[provider];
+  const sameAsConfigured = provider === configuredProvider;
+
+  const providerEnvKey = process.env[info.envVar]?.trim();
+  const genericEnvKey = provider === "gemini" ? undefined : process.env.CTX_LLM_API_KEY?.trim();
+  const envKey = providerEnvKey || genericEnvKey;
+
+  const cfgKey =
+    (sameAsConfigured ? nonEmpty(config.llmApiKey) : undefined) ??
+    (provider === "gemini" ? nonEmpty(config.geminiKey) : undefined);
+
+  const apiKey = envKey || cfgKey;
+  const source: "env" | "config" | "none" = envKey ? "env" : cfgKey ? "config" : "none";
+
+  const envModel =
+    process.env.CTX_LLM_MODEL?.trim() ||
+    (provider === "gemini" ? process.env.CTX_GEMINI_MODEL?.trim() : undefined);
+  const cfgModel =
+    (sameAsConfigured ? nonEmpty(config.llmModel) : undefined) ??
+    (provider === "gemini" ? nonEmpty(config.geminiModel) : undefined);
+  const model = overrides.model?.trim() || envModel || cfgModel || info.defaultModel;
+
+  const rawBaseUrl =
+    overrides.baseUrl?.trim() ||
+    process.env.CTX_LLM_BASE_URL?.trim() ||
+    (sameAsConfigured ? nonEmpty(config.llmBaseUrl) : undefined) ||
+    info.defaultBaseUrl;
+  const baseUrl = rawBaseUrl.replace(/\/+$/, "");
+
+  return {
+    provider,
+    providerLabel: info.label,
+    model,
+    baseUrl,
+    apiKey,
+    source,
+    envVar: info.envVar,
+    requiresKey: info.requiresKey,
+    isConfigured: !info.requiresKey || Boolean(apiKey),
+  };
+}
+
+export function resolveGeminiSettings(config: CtxConfig = loadConfig()): GeminiSettings {
+  const resolved = resolveLlmSettings(config, { provider: "gemini" });
+  return {
+    apiKey: resolved.apiKey,
+    source: resolved.source,
+    model: resolved.model,
+  };
 }
 
 export function redactConfig(config: CtxConfig = loadConfig()): RedactedConfig {
+  const llm = resolveLlmSettings(config);
   const gemini = resolveGeminiSettings(config);
   return {
     hasGeminiKey: Boolean(gemini.apiKey),
-    keySource: gemini.source,
+    keySource: llm.source,
     geminiModel: gemini.model,
     standupFormat: config.standupFormat,
     dataDir: getDataDir(),
+    llmProvider: llm.provider,
+    llmProviderLabel: llm.providerLabel,
+    llmModel: llm.model,
+    llmBaseUrl: llm.baseUrl,
+    hasApiKey: Boolean(llm.apiKey),
+    isLlmConfigured: llm.isConfigured,
+    envVarHint: llm.envVar,
+    providers: Object.values(LLM_PROVIDERS),
   };
 }
