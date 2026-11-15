@@ -1,0 +1,1516 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ctx — Git Context</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --surface: #12151d;
+      --surface-2: #171b25;
+      --hover: rgba(255, 255, 255, 0.04);
+      --selected: rgba(96, 165, 250, 0.09);
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
+      --text: #e8ecf2;
+      --text-soft: #9aa4b2;
+      --text-dim: #667080;
+      --accent: #60a5fa;
+      --accent-bg: rgba(96, 165, 250, 0.14);
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --purple: #c084fc;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13.5px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      font-variant-numeric: tabular-nums;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    button, input, select, textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 5px 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-soft);
+      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+    }
+    button:hover:not(:disabled) {
+      background: var(--hover);
+      color: var(--text);
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    button.subtle {
+      background: var(--surface-2);
+      border-color: var(--line);
+      color: var(--text);
+    }
+    button.subtle:hover:not(:disabled) {
+      border-color: var(--line-strong);
+      background: #1d222e;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #08111e;
+      font-weight: 600;
+    }
+    button.primary:hover:not(:disabled) {
+      background: #7ab5fc;
+      color: #08111e;
+    }
+
+    button.danger-text:hover:not(:disabled) { color: var(--red); background: rgba(248, 113, 113, 0.1); }
+    button.sm { padding: 3px 8px; font-size: 12px; }
+    button.icon-btn {
+      padding: 2px 6px;
+      font-size: 13px;
+      line-height: 1;
+      border-radius: 4px;
+      color: var(--text-dim);
+    }
+
+    input[type="text"], input[type="password"], input[type="url"], select, textarea {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 10px;
+      outline: none;
+      transition: border-color 0.14s ease, background 0.14s ease;
+    }
+    input::placeholder, textarea::placeholder { color: var(--text-dim); }
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(96, 165, 250, 0.6);
+      background: var(--surface-2);
+    }
+
+    select { cursor: pointer; }
+
+    /* Header */
+    .topbar {
+      height: 52px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 13, 18, 0.88);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .brand {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 99px;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(96, 165, 250, 0.65);
+    }
+    .segmented {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .segmented button {
+      padding: 4px 11px;
+      font-size: 12.5px;
+      border-radius: 5px;
+      border: none;
+      font-weight: 500;
+    }
+    .segmented button.active {
+      background: var(--surface-2);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .stats-text {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+    }
+
+    /* Main Layout */
+    .shell {
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 20px 24px 36px;
+    }
+
+    .cockpit {
+      display: grid;
+      grid-template-columns: minmax(340px, 0.92fr) minmax(400px, 1.08fr);
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 920px) {
+      .cockpit { grid-template-columns: 1fr; }
+      .shell { padding: 14px 16px; }
+      .topbar { padding: 0 16px; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+    .search-wrap input {
+      width: 100%;
+      padding-right: 28px;
+      background: var(--bg);
+    }
+    .kbd-hint {
+      position: absolute;
+      right: 8px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--text-dim);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0 4px;
+      pointer-events: none;
+    }
+
+    .toggle-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--text-soft);
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      border: 1px solid transparent;
+    }
+    .toggle-chip:hover { background: var(--hover); color: var(--text); }
+    .toggle-chip input { accent-color: var(--accent); cursor: pointer; }
+
+    /* Repo List */
+    .repo-list {
+      max-height: calc(100vh - 170px);
+      overflow-y: auto;
+    }
+    .repo-row {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      transition: background 0.1s ease;
+    }
+    .repo-row:last-child { border-bottom: none; }
+    .repo-row:hover { background: var(--hover); }
+    .repo-row.selected {
+      background: var(--selected);
+      box-shadow: inset 2px 0 0 var(--accent);
+    }
+    .repo-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .repo-title {
+      font-weight: 600;
+      font-size: 13.5px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .repo-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 11.5px;
+    }
+    .branch-tag {
+      color: var(--accent);
+      background: var(--accent-bg);
+      padding: 1px 7px;
+      border-radius: 5px;
+      max-width: 170px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .git-marks { color: var(--text-soft); display: inline-flex; gap: 5px; }
+    .c-green { color: var(--green); }
+    .c-amber { color: var(--amber); }
+    .c-red { color: var(--red); }
+    .c-purple { color: var(--purple); }
+    .c-dim { color: var(--text-dim); }
+
+    .repo-sub {
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .repo-commit {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .repo-counters {
+      display: inline-flex;
+      gap: 8px;
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    /* Detail Panel */
+    .detail-head {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .detail-name {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .detail-path {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      word-break: break-all;
+    }
+    .detail-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .detail-body { padding: 16px 18px; }
+
+    .branch-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+    .branch-select-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 200px;
+    }
+    .branch-select-wrap select {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      background: var(--bg);
+      max-width: 100%;
+      flex: 1;
+    }
+
+    .block { margin-top: 18px; }
+    .block-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .link-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    .link-row a {
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .clean-list {
+      display: flex;
+      flex-direction: column;
+    }
+    .clean-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 6px;
+      border-radius: 6px;
+      transition: background 0.1s ease;
+    }
+    .clean-row:hover { background: var(--hover); }
+    .clean-row .row-del { opacity: 0; transition: opacity 0.12s ease; }
+    .clean-row:hover .row-del, .clean-row:focus-within .row-del { opacity: 1; }
+    .clean-row-main {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .clean-row-main input[type="checkbox"] {
+      margin-top: 3px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .note-bullet {
+      color: var(--text-dim);
+      font-family: var(--mono);
+      user-select: none;
+    }
+    .todo-done { text-decoration: line-through; color: var(--text-dim); }
+
+    .ghost-input-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .ghost-input-row input {
+      flex: 1;
+      background: transparent;
+      border-color: transparent;
+      border-bottom-color: var(--line);
+      border-radius: 0;
+      padding: 6px 4px;
+    }
+    .ghost-input-row input:focus {
+      background: transparent;
+      border-color: transparent;
+      border-bottom-color: var(--accent);
+    }
+
+    details.wip-details {
+      margin-top: 16px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+    details.wip-details summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-soft);
+      user-select: none;
+    }
+    .wip-list {
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--text-soft);
+      max-height: 150px;
+      overflow-y: auto;
+      padding-left: 2px;
+    }
+
+    /* Studio */
+    .studio {
+      display: grid;
+      grid-template-columns: 270px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .studio { grid-template-columns: 1fr; }
+    }
+    .studio-side { padding: 16px; }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 13px;
+    }
+    .field label {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      color: var(--text-soft);
+      cursor: pointer;
+      margin-bottom: 6px;
+    }
+    .check-row input { accent-color: var(--accent); cursor: pointer; }
+
+    .output-area {
+      width: 100%;
+      min-height: 410px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      resize: vertical;
+      border: none;
+      border-radius: 0;
+      padding: 16px 18px;
+      background: var(--surface);
+    }
+    .output-area:focus { background: var(--surface); }
+
+    .notice {
+      margin: 12px 18px 0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      color: #fde68a;
+    }
+    .notice.info {
+      background: var(--accent-bg);
+      border-color: rgba(96, 165, 250, 0.25);
+      color: #bfdbfe;
+      margin: 0 0 14px 0;
+    }
+
+    .payload-details {
+      padding: 10px 18px 14px;
+      border-top: 1px solid var(--line);
+    }
+    .payload-details summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-dim);
+      user-select: none;
+    }
+    .payload-details pre {
+      margin: 10px 0 0;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--text-soft);
+      overflow-x: auto;
+      max-height: 240px;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 40;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: 100%;
+      max-width: 500px;
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      overflow: hidden;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    .modal-body { padding: 18px; overflow-y: auto; }
+
+    .empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-strong);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 0.16s ease, transform 0.16s ease;
+      z-index: 60;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.err { border-color: rgba(248, 113, 113, 0.45); color: #fecaca; }
+
+    .mono { font-family: var(--mono); }
+    .small { font-size: 12px; }
+    .muted { color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>ctx</span>
+      </div>
+      <nav class="segmented" aria-label="Primary views">
+        <button class="active" data-tab="cockpit">Repos</button>
+        <button data-tab="studio">Standup &amp; PR</button>
+      </nav>
+    </div>
+    <div class="topbar-right">
+      <span id="summaryStats" class="stats-text"></span>
+      <button id="settingsBtn">Settings</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <!-- REPOS & CONTEXT -->
+    <section id="tab-cockpit">
+      <div class="cockpit">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="search-wrap">
+              <input id="repoSearch" type="text" placeholder="Filter repos or branches..." />
+              <span class="kbd-hint">/</span>
+            </div>
+            <label class="toggle-chip" title="Show only repos with local edits, unpushed commits, or stashes">
+              <input id="dirtyOnlyToggle" type="checkbox" />
+              <span>Dirty</span>
+            </label>
+            <button id="refreshBtn" class="sm" title="Refresh status">Refresh</button>
+            <button id="fetchAllBtn" class="sm" title="Run git fetch --prune across repos">Fetch</button>
+            <button id="addRepoToggleBtn" class="sm subtle">+ Add</button>
+          </div>
+          <form id="addRepoForm" class="panel-head" style="display:none;background:var(--bg);">
+            <input id="addRepoPath" type="text" placeholder="Path to git repo or workspace folder..." style="flex:1;" />
+            <select id="addRepoMode">
+              <option value="repo">Repo</option>
+              <option value="watch">Watch Folder</option>
+            </select>
+            <button type="submit" class="sm primary">Save</button>
+          </form>
+          <div id="repoList" class="repo-list">
+            <div class="empty">Scanning repositories...</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="detail-head">
+            <div>
+              <div id="detailRepoName" class="detail-name">Select a repository</div>
+              <div id="detailRepoPath" class="detail-path"></div>
+            </div>
+            <div class="detail-actions" id="detailRepoActions"></div>
+          </div>
+          <div class="detail-body" id="detailBody">
+            <div class="empty">Choose a repository to view or edit branch notes, TODOs, and links.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STANDUP & PR STUDIO -->
+    <section id="tab-studio" style="display:none;">
+      <div class="studio">
+        <div class="panel studio-side">
+          <div class="segmented" style="width:100%;margin-bottom:16px;">
+            <button id="modeStandupBtn" class="active" style="flex:1;justify-content:center;">Standup</button>
+            <button id="modePrBtn" style="flex:1;justify-content:center;">PR Draft</button>
+          </div>
+
+          <div id="standupControls">
+            <div class="field">
+              <label for="standupSince">Window</label>
+              <select id="standupSince">
+                <option value="">Last workday (Fri on Mon)</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="today">Today</option>
+                <option value="2d">Last 2 days</option>
+                <option value="3d">Last 3 days</option>
+                <option value="7d">Last 7 days</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="standupFormat">Format</label>
+              <select id="standupFormat">
+                <option value="markdown">Markdown</option>
+                <option value="slack">Slack bullets</option>
+              </select>
+            </div>
+            <label class="check-row"><input type="checkbox" id="standupAllAuthors" /> All commit authors</label>
+            <label class="check-row"><input type="checkbox" id="standupRaw" /> Offline raw mode</label>
+            <button id="generateStandupBtn" class="primary" style="width:100%;justify-content:center;margin-top:10px;">Generate Standup</button>
+          </div>
+
+          <div id="prControls" style="display:none;">
+            <div class="field">
+              <label for="prRepoSelect">Repository</label>
+              <select id="prRepoSelect"></select>
+            </div>
+            <div class="field">
+              <label for="prBranchInput">Source branch</label>
+              <input id="prBranchInput" type="text" placeholder="Current branch" />
+            </div>
+            <div class="field">
+              <label for="prBaseInput">Base branch</label>
+              <input id="prBaseInput" type="text" placeholder="Auto (main / master)" />
+            </div>
+            <label class="check-row"><input type="checkbox" id="prRaw" /> Offline raw mode</label>
+            <button id="generatePrBtn" class="primary" style="width:100%;justify-content:center;margin-top:10px;">Draft PR Description</button>
+          </div>
+
+          <div class="small muted" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
+            Metadata-only: only commit subjects, file paths, and your notes/TODOs leave this machine.
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-weight:600;">Output</span>
+              <span id="studioModeLabel" class="small mono muted"></span>
+            </div>
+            <button id="copyOutputBtn" class="sm subtle">Copy</button>
+          </div>
+          <div id="studioWarning" class="notice" style="display:none;"></div>
+          <textarea id="studioOutput" class="output-area" placeholder="Generate a standup or PR draft..."></textarea>
+          <details class="payload-details">
+            <summary>Inspect metadata payload</summary>
+            <pre id="studioMetadata">(nothing generated yet)</pre>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="panel-head">
+        <span style="font-weight:600;">Settings</span>
+        <button id="closeSettingsBtn" class="sm">Esc</button>
+      </div>
+      <div class="modal-body">
+        <div id="keyStatusBanner" class="notice info"></div>
+
+        <div class="field">
+          <label for="cfgGeminiKey">Gemini API Key (leave blank to keep existing or use GEMINI_API_KEY)</label>
+          <div style="display:flex;gap:8px;">
+            <input id="cfgGeminiKey" type="password" placeholder="AIza..." style="flex:1;" />
+            <button id="clearSavedKeyBtn" class="sm danger-text">Clear</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="cfgGeminiModel">Model</label>
+          <input id="cfgGeminiModel" type="text" placeholder="gemini-2.5-flash" />
+        </div>
+        <div class="field">
+          <label for="cfgStandupFormat">Default standup format</label>
+          <select id="cfgStandupFormat">
+            <option value="markdown">Markdown</option>
+            <option value="slack">Slack</option>
+          </select>
+        </div>
+        <button id="saveConfigBtn" class="primary">Save</button>
+
+        <div class="block" style="margin-top:22px;padding-top:16px;border-top:1px solid var(--line);">
+          <div class="block-label">Watched folders</div>
+          <div id="watchedDirsList" class="clean-list"></div>
+          <form id="addWatchForm" class="ghost-input-row">
+            <input id="watchDirInput" type="text" placeholder="Add parent folder to watch (e.g. C:\Users\Lenovo\dev)" />
+            <button type="submit" class="sm subtle">Watch</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const state = {
+      overview: [],
+      selectedRepoId: null,
+      selectedBranch: null,
+      repoDetail: null,
+      confirmUntrackId: null,
+      editingLink: false,
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    let toastTimer = null;
+    function notify(msg, isErr = false) {
+      const t = $("toast");
+      t.textContent = msg;
+      t.className = `toast show${isErr ? " err" : ""}`;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+    }
+
+    function el(tag, attrs = {}, children = []) {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else if (k === "checked") node.checked = Boolean(v);
+        else if (k.startsWith("on") && typeof v === "function") {
+          node.addEventListener(k.slice(2).toLowerCase(), v);
+        } else {
+          node.setAttribute(k, v);
+        }
+      }
+      for (const child of children) {
+        if (typeof child === "string") node.appendChild(document.createTextNode(child));
+        else if (child) node.appendChild(child);
+      }
+      return node;
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
+
+    function relTime(iso) {
+      if (!iso) return "";
+      const sec = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
+      if (Number.isNaN(sec)) return "";
+      if (sec < 60) return "just now";
+      if (sec < 3600) return Math.floor(sec / 60) + "m";
+      if (sec < 86400) return Math.floor(sec / 3600) + "h";
+      return Math.floor(sec / 86400) + "d";
+    }
+
+    async function loadOverview(fetchAll = false) {
+      const btn = fetchAll ? $("fetchAllBtn") : $("refreshBtn");
+      btn.disabled = true;
+      try {
+        const data = await api(`/api/overview?sync=1${fetchAll ? "&fetch=1" : ""}`);
+        state.overview = data.items || [];
+        updateTopSummary();
+        renderRepoList();
+        renderPrRepoOptions();
+        if (!state.selectedRepoId && state.overview.length > 0) {
+          await selectRepo(state.overview[0].repo.id);
+        } else if (state.selectedRepoId) {
+          if (state.overview.some((i) => i.repo.id === state.selectedRepoId)) {
+            await loadRepoDetail(state.selectedRepoId, state.selectedBranch);
+          } else {
+            state.selectedRepoId = null;
+            renderEmptyDetail();
+          }
+        }
+        if (fetchAll) notify("Fetched remotes");
+      } catch (err) {
+        notify(err.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function updateTopSummary() {
+      const total = state.overview.length;
+      const dirty = state.overview.filter((i) =>
+        i.status.staged + i.status.modified + i.status.untracked + i.status.conflicted + i.status.ahead > 0
+      ).length;
+      const todos = state.overview.reduce((s, i) => s + i.totalOpenTodos, 0);
+      $("summaryStats").textContent = `${total} repos · ${dirty} dirty · ${todos} todos`;
+    }
+
+    function renderRepoList() {
+      const list = $("repoList");
+      list.innerHTML = "";
+      const query = $("repoSearch").value.trim().toLowerCase();
+      const dirtyOnly = $("dirtyOnlyToggle").checked;
+
+      const filtered = state.overview.filter((item) => {
+        if (dirtyOnly) {
+          const s = item.status;
+          const isDirty = s.staged + s.modified + s.untracked + s.conflicted + s.ahead + s.behind + s.stashCount > 0 || s.missing;
+          if (!isDirty) return false;
+        }
+        if (query) {
+          const hay = `${item.repo.name} ${item.status.branch} ${item.repo.rootPath}`.toLowerCase();
+          if (!hay.includes(query)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        list.appendChild(el("div", {
+          class: "empty",
+          text: state.overview.length === 0 ? "No tracked repositories yet. Click + Add." : "No matching repositories.",
+        }));
+        return;
+      }
+
+      for (const item of filtered) {
+        const s = item.status;
+        const marks = [];
+        if (s.missing) {
+          marks.push(el("span", { class: "c-red", text: "missing" }));
+        } else {
+          if (s.conflicted > 0) marks.push(el("span", { class: "c-red", text: `!${s.conflicted}` }));
+          if (s.staged > 0) marks.push(el("span", { class: "c-green", text: `+${s.staged}` }));
+          if (s.modified > 0) marks.push(el("span", { class: "c-amber", text: `~${s.modified}` }));
+          if (s.untracked > 0) marks.push(el("span", { class: "c-dim", text: `?${s.untracked}` }));
+          if (s.ahead > 0) marks.push(el("span", { class: "c-green", text: `↑${s.ahead}` }));
+          if (s.behind > 0) marks.push(el("span", { class: "c-amber", text: `↓${s.behind}` }));
+          if (s.stashCount > 0) marks.push(el("span", { class: "c-purple", text: `s:${s.stashCount}` }));
+        }
+
+        const counters = [];
+        if (item.currentBranchOpenTodos > 0) {
+          counters.push(el("span", { class: "c-amber", text: `${item.currentBranchOpenTodos} todo` }));
+        }
+        if (item.currentBranchNotes > 0) {
+          counters.push(el("span", { class: "c-dim", text: `${item.currentBranchNotes} note` }));
+        }
+        if (s.lastCommit) {
+          counters.push(el("span", { class: "c-dim", text: relTime(s.lastCommit.committedAt) }));
+        }
+
+        const commitText = s.lastCommit ? s.lastCommit.subject : (s.error || "No commits");
+        const row = el("div", {
+          class: `repo-row ${item.repo.id === state.selectedRepoId ? "selected" : ""}`,
+          onClick: () => selectRepo(item.repo.id),
+        }, [
+          el("div", { class: "repo-top" }, [
+            el("span", { class: "repo-title", text: item.repo.name }),
+            el("div", { class: "repo-right" }, [
+              marks.length > 0 ? el("span", { class: "git-marks" }, marks) : null,
+              el("span", { class: "branch-tag", text: s.branch }),
+            ]),
+          ]),
+          el("div", { class: "repo-sub" }, [
+            el("span", { class: "repo-commit", text: commitText }),
+            el("span", { class: "repo-counters" }, counters),
+          ]),
+        ]);
+        list.appendChild(row);
+      }
+    }
+
+    async function selectRepo(repoId) {
+      state.selectedRepoId = repoId;
+      state.selectedBranch = null;
+      state.confirmUntrackId = null;
+      state.editingLink = false;
+      renderRepoList();
+      await loadRepoDetail(repoId);
+    }
+
+    function renderEmptyDetail() {
+      $("detailRepoName").textContent = "Select a repository";
+      $("detailRepoPath").textContent = "";
+      $("detailRepoActions").innerHTML = "";
+      $("detailBody").innerHTML = "";
+      $("detailBody").appendChild(el("div", { class: "empty", text: "Choose a repository to view or edit branch notes, TODOs, and links." }));
+    }
+
+    async function loadRepoDetail(repoId, branchOverride = null) {
+      const detail = await api(`/api/repos/${repoId}/context${branchOverride ? `?branch=${encodeURIComponent(branchOverride)}` : ""}`);
+      state.repoDetail = detail;
+      state.selectedBranch = detail.selectedBranch;
+      renderRepoDetail();
+    }
+
+    function renderRepoDetail() {
+      const d = state.repoDetail;
+      if (!d) return;
+
+      $("detailRepoName").textContent = d.repo.name;
+      $("detailRepoPath").textContent = d.repo.rootPath;
+
+      const actions = $("detailRepoActions");
+      actions.innerHTML = "";
+      actions.appendChild(el("button", {
+        class: "sm",
+        text: "Fetch",
+        onClick: async (e) => {
+          e.target.disabled = true;
+          try {
+            await api(`/api/repos/${d.repo.id}/fetch`, { method: "POST" });
+            await loadOverview(false);
+            notify(`Fetched ${d.repo.name}`);
+          } catch (err) {
+            notify(err.message, true);
+          } finally {
+            e.target.disabled = false;
+          }
+        },
+      }));
+      actions.appendChild(el("button", {
+        class: `sm ${d.hook.installed ? "subtle" : ""}`,
+        text: d.hook.installed ? "Hook: On" : "Hook: Off",
+        title: d.hook.installed ? "Click to remove post-checkout hook" : "Click to install post-checkout hook",
+        onClick: async () => {
+          const action = d.hook.installed ? "uninstall" : "install";
+          await api(`/api/repos/${d.repo.id}/hook`, {
+            method: "POST",
+            body: JSON.stringify({ action }),
+          });
+          await loadRepoDetail(d.repo.id, state.selectedBranch);
+          notify(action === "install" ? "Post-checkout hook installed" : "Post-checkout hook removed");
+        },
+      }));
+
+      const confirming = state.confirmUntrackId === d.repo.id;
+      actions.appendChild(el("button", {
+        class: `sm danger-text ${confirming ? "subtle" : ""}`,
+        text: confirming ? "Confirm?" : "Untrack",
+        onClick: async () => {
+          if (!confirming) {
+            state.confirmUntrackId = d.repo.id;
+            renderRepoDetail();
+            setTimeout(() => {
+              if (state.confirmUntrackId === d.repo.id) {
+                state.confirmUntrackId = null;
+                renderRepoDetail();
+              }
+            }, 3000);
+            return;
+          }
+          await api(`/api/repos/${d.repo.id}`, { method: "DELETE" });
+          state.selectedRepoId = null;
+          state.confirmUntrackId = null;
+          await loadOverview(false);
+          notify(`Untracked ${d.repo.name}`);
+        },
+      }));
+
+      const body = $("detailBody");
+      body.innerHTML = "";
+
+      // Branch switcher select
+      const branchSet = new Set([d.currentBranch, ...d.branchSummaries.map((b) => b.branch), ...d.localBranches]);
+      const summaryByBranch = new Map(d.branchSummaries.map((b) => [b.branch, b]));
+      const branchSelect = el("select", {
+        onChange: () => {
+          state.editingLink = false;
+          loadRepoDetail(d.repo.id, branchSelect.value);
+        },
+      });
+      for (const b of branchSet) {
+        if (!b) continue;
+        const info = summaryByBranch.get(b);
+        const tags = [];
+        if (b === d.currentBranch) tags.push("HEAD");
+        if (info && info.noteCount > 0) tags.push(`${info.noteCount}n`);
+        if (info && info.openTodoCount > 0) tags.push(`${info.openTodoCount}t`);
+        branchSelect.appendChild(el("option", {
+          value: b,
+          text: tags.length > 0 ? `${b} (${tags.join(", ")})` : b,
+          ...(b === d.selectedBranch ? { selected: true } : {}),
+        }));
+      }
+      branchSelect.value = d.selectedBranch;
+
+      body.appendChild(el("div", { class: "branch-bar" }, [
+        el("div", { class: "branch-select-wrap" }, [
+          el("span", { class: "small muted", text: "Branch" }),
+          branchSelect,
+        ]),
+        d.context.lastVisitedAt
+          ? el("span", { class: "small mono muted", text: `visited ${relTime(d.context.lastVisitedAt)}` })
+          : null,
+      ]));
+
+      // Link block
+      const linkBlock = el("div", { class: "block" });
+      linkBlock.appendChild(el("div", { class: "block-label" }, [
+        el("span", { text: "PR / Ticket Link" }),
+        d.context.link && !state.editingLink
+          ? el("button", {
+              class: "sm",
+              text: "Edit",
+              onClick: () => { state.editingLink = true; renderRepoDetail(); },
+            })
+          : null,
+      ]));
+      if (d.context.link && !state.editingLink) {
+        const isSafeHttp = /^https?:\/\//i.test(d.context.link);
+        linkBlock.appendChild(el("div", { class: "link-row" }, [
+          isSafeHttp
+            ? el("a", { href: d.context.link, target: "_blank", rel: "noopener noreferrer", text: d.context.link })
+            : el("span", { class: "small mono", text: d.context.link }),
+          el("button", {
+            class: "icon-btn danger-text",
+            text: "×",
+            title: "Clear link",
+            onClick: async () => {
+              await api("/api/context/link", {
+                method: "PUT",
+                body: JSON.stringify({ commonDir: d.repo.commonDir, branch: d.selectedBranch, link: null }),
+              });
+              await loadOverview(false);
+            },
+          }),
+        ]));
+      } else {
+        const linkInput = el("input", {
+          type: "url",
+          value: d.context.link || "",
+          placeholder: "Attach PR or Jira / Linear URL...",
+        });
+        linkBlock.appendChild(el("form", {
+          class: "ghost-input-row",
+          onSubmit: async (e) => {
+            e.preventDefault();
+            await api("/api/context/link", {
+              method: "PUT",
+              body: JSON.stringify({ commonDir: d.repo.commonDir, branch: d.selectedBranch, link: linkInput.value.trim() || null }),
+            });
+            state.editingLink = false;
+            await loadOverview(false);
+          },
+        }, [
+          linkInput,
+          el("button", { type: "submit", class: "sm", text: "Save" }),
+        ]));
+      }
+      body.appendChild(linkBlock);
+
+      // Notes block
+      const notesBlock = el("div", { class: "block" });
+      notesBlock.appendChild(el("div", { class: "block-label" }, [
+        el("span", { text: "Notes" }),
+        d.context.notes.length > 0 ? el("span", { class: "mono", text: String(d.context.notes.length) }) : null,
+      ]));
+      const notesList = el("div", { class: "clean-list" });
+      for (const n of d.context.notes) {
+        notesList.appendChild(el("div", { class: "clean-row" }, [
+          el("div", { class: "clean-row-main" }, [
+            el("span", { class: "note-bullet", text: "•" }),
+            el("div", { style: "flex:1;" }, [
+              el("div", { text: n.content }),
+              el("div", { class: "small muted", text: relTime(n.createdAt) }),
+            ]),
+          ]),
+          el("button", {
+            class: "icon-btn danger-text row-del",
+            text: "×",
+            title: "Delete note",
+            onClick: async () => {
+              await api(`/api/context/notes/${n.id}`, { method: "DELETE" });
+              await loadOverview(false);
+            },
+          }),
+        ]));
+      }
+      const noteInput = el("input", { type: "text", placeholder: "+ Add note..." });
+      notesBlock.appendChild(notesList);
+      notesBlock.appendChild(el("form", {
+        class: "ghost-input-row",
+        onSubmit: async (e) => {
+          e.preventDefault();
+          const val = noteInput.value.trim();
+          if (!val) return;
+          await api("/api/context/notes", {
+            method: "POST",
+            body: JSON.stringify({ commonDir: d.repo.commonDir, branch: d.selectedBranch, content: val }),
+          });
+          noteInput.value = "";
+          await loadOverview(false);
+        },
+      }, [noteInput]));
+      body.appendChild(notesBlock);
+
+      // TODOs block
+      const openCount = d.context.todos.filter((t) => !t.done).length;
+      const todosBlock = el("div", { class: "block" });
+      todosBlock.appendChild(el("div", { class: "block-label" }, [
+        el("span", { text: "TODOs" }),
+        openCount > 0 ? el("span", { class: "mono c-amber", text: `${openCount} open` }) : null,
+      ]));
+      const todosList = el("div", { class: "clean-list" });
+      for (const t of d.context.todos) {
+        const cb = el("input", {
+          type: "checkbox",
+          ...(t.done ? { checked: true } : {}),
+          onChange: async () => {
+            await api(`/api/context/todos/${t.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ done: cb.checked }),
+            });
+            await loadOverview(false);
+          },
+        });
+        todosList.appendChild(el("div", { class: "clean-row" }, [
+          el("label", { class: "clean-row-main", style: "cursor:pointer;" }, [
+            cb,
+            el("span", { class: t.done ? "todo-done" : "", text: t.text }),
+          ]),
+          el("button", {
+            class: "icon-btn danger-text row-del",
+            text: "×",
+            title: "Delete TODO",
+            onClick: async () => {
+              await api(`/api/context/todos/${t.id}`, { method: "DELETE" });
+              await loadOverview(false);
+            },
+          }),
+        ]));
+      }
+      const todoInput = el("input", { type: "text", placeholder: "+ Add TODO..." });
+      todosBlock.appendChild(todosList);
+      todosBlock.appendChild(el("form", {
+        class: "ghost-input-row",
+        onSubmit: async (e) => {
+          e.preventDefault();
+          const val = todoInput.value.trim();
+          if (!val) return;
+          await api("/api/context/todos", {
+            method: "POST",
+            body: JSON.stringify({ commonDir: d.repo.commonDir, branch: d.selectedBranch, text: val }),
+          });
+          todoInput.value = "";
+          await loadOverview(false);
+        },
+      }, [todoInput]));
+      body.appendChild(todosBlock);
+
+      // Collapsible working tree WIP files
+      if (d.selectedBranch === d.currentBranch && d.status.dirtyFiles.length > 0) {
+        const details = el("details", { class: "wip-details" }, [
+          el("summary", { text: `Working tree WIP (${d.status.dirtyFiles.length} files)` }),
+          el("div", { class: "wip-list" }, d.status.dirtyFiles.map((f) => el("div", { text: `${f.code}  ${f.path}` }))),
+        ]);
+        body.appendChild(details);
+      }
+    }
+
+    function renderPrRepoOptions() {
+      const sel = $("prRepoSelect");
+      const current = sel.value;
+      sel.innerHTML = "";
+      for (const item of state.overview) {
+        sel.appendChild(el("option", { value: String(item.repo.id), text: `${item.repo.name} (${item.status.branch})` }));
+      }
+      if (current && [...sel.options].some((o) => o.value === current)) {
+        sel.value = current;
+      } else if (state.selectedRepoId) {
+        sel.value = String(state.selectedRepoId);
+      }
+    }
+
+    async function loadSettings() {
+      const [cfg, watchData] = await Promise.all([api("/api/config"), api("/api/watch")]);
+      $("cfgGeminiModel").value = cfg.geminiModel;
+      $("cfgStandupFormat").value = cfg.standupFormat;
+      $("standupFormat").value = cfg.standupFormat;
+      $("cfgGeminiKey").value = "";
+
+      const banner = $("keyStatusBanner");
+      if (cfg.hasGeminiKey) {
+        banner.textContent = `Gemini key active via ${cfg.keySource === "env" ? "GEMINI_API_KEY env" : "local config"}.`;
+      } else {
+        banner.textContent = "No Gemini key set — summaries will use offline structured fallback.";
+      }
+
+      const list = $("watchedDirsList");
+      list.innerHTML = "";
+      if (watchData.dirs.length === 0) {
+        list.appendChild(el("div", { class: "small muted", text: "No watched folders configured." }));
+      } else {
+        for (const d of watchData.dirs) {
+          list.appendChild(el("div", { class: "clean-row" }, [
+            el("span", { class: "mono small", text: d.dirPath }),
+            el("button", {
+              class: "icon-btn danger-text row-del",
+              text: "×",
+              title: "Stop watching",
+              onClick: async () => {
+                await api(`/api/watch?id=${d.id}`, { method: "DELETE" });
+                await loadSettings();
+              },
+            }),
+          ]));
+        }
+      }
+    }
+
+    function showStudioResult(res) {
+      $("studioOutput").value = res.markdown || "";
+      $("studioMetadata").textContent = JSON.stringify(res.payload, null, 2);
+      $("studioModeLabel").textContent =
+        res.mode === "gemini" ? "gemini" : res.mode === "fallback" ? "offline fallback" : "raw";
+      if (res.warning) {
+        $("studioWarning").style.display = "block";
+        $("studioWarning").textContent = res.warning;
+      } else {
+        $("studioWarning").style.display = "none";
+      }
+    }
+
+    // Navigation & actions
+    document.querySelectorAll(".topbar nav button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".topbar nav button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const tab = btn.dataset.tab;
+        $("tab-cockpit").style.display = tab === "cockpit" ? "block" : "none";
+        $("tab-studio").style.display = tab === "studio" ? "block" : "none";
+      });
+    });
+
+    $("repoSearch").addEventListener("input", renderRepoList);
+    $("dirtyOnlyToggle").addEventListener("change", renderRepoList);
+    $("refreshBtn").addEventListener("click", () => loadOverview(false));
+    $("fetchAllBtn").addEventListener("click", () => loadOverview(true));
+    $("addRepoToggleBtn").addEventListener("click", () => {
+      const f = $("addRepoForm");
+      const opening = f.style.display === "none";
+      f.style.display = opening ? "flex" : "none";
+      if (opening) $("addRepoPath").focus();
+    });
+    $("addRepoForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const targetPath = $("addRepoPath").value.trim();
+      if (!targetPath) return;
+      const mode = $("addRepoMode").value;
+      try {
+        if (mode === "watch") {
+          await api("/api/watch", { method: "POST", body: JSON.stringify({ dirPath: targetPath }) });
+        } else {
+          await api("/api/repos", { method: "POST", body: JSON.stringify({ path: targetPath }) });
+        }
+        $("addRepoPath").value = "";
+        $("addRepoForm").style.display = "none";
+        await loadOverview(false);
+        notify(mode === "watch" ? "Watched folder added" : "Repository tracked");
+      } catch (err) {
+        notify(err.message, true);
+      }
+    });
+
+    $("modeStandupBtn").addEventListener("click", () => {
+      $("modeStandupBtn").classList.add("active");
+      $("modePrBtn").classList.remove("active");
+      $("standupControls").style.display = "block";
+      $("prControls").style.display = "none";
+    });
+    $("modePrBtn").addEventListener("click", () => {
+      $("modePrBtn").classList.add("active");
+      $("modeStandupBtn").classList.remove("active");
+      $("prControls").style.display = "block";
+      $("standupControls").style.display = "none";
+    });
+
+    $("generateStandupBtn").addEventListener("click", async () => {
+      const btn = $("generateStandupBtn");
+      btn.disabled = true;
+      btn.textContent = "Generating...";
+      try {
+        const res = await api("/api/standup", {
+          method: "POST",
+          body: JSON.stringify({
+            since: $("standupSince").value || undefined,
+            format: $("standupFormat").value,
+            allAuthors: $("standupAllAuthors").checked,
+            raw: $("standupRaw").checked,
+          }),
+        });
+        showStudioResult(res);
+      } catch (err) {
+        notify(err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Generate Standup";
+      }
+    });
+
+    $("generatePrBtn").addEventListener("click", async () => {
+      const repoId = Number($("prRepoSelect").value);
+      if (!repoId) return notify("Select a repository first", true);
+      const btn = $("generatePrBtn");
+      btn.disabled = true;
+      btn.textContent = "Drafting...";
+      try {
+        const res = await api("/api/pr", {
+          method: "POST",
+          body: JSON.stringify({
+            repoId,
+            branch: $("prBranchInput").value.trim() || undefined,
+            baseBranch: $("prBaseInput").value.trim() || undefined,
+            raw: $("prRaw").checked,
+          }),
+        });
+        showStudioResult(res);
+      } catch (err) {
+        notify(err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Draft PR Description";
+      }
+    });
+
+    $("copyOutputBtn").addEventListener("click", async () => {
+      const text = $("studioOutput").value;
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      const btn = $("copyOutputBtn");
+      btn.textContent = "Copied";
+      setTimeout(() => (btn.textContent = "Copy"), 1200);
+    });
+
+    $("settingsBtn").addEventListener("click", async () => {
+      await loadSettings();
+      $("settingsModal").classList.add("open");
+    });
+    $("closeSettingsBtn").addEventListener("click", () => $("settingsModal").classList.remove("open"));
+    $("settingsModal").addEventListener("click", (e) => {
+      if (e.target === $("settingsModal")) $("settingsModal").classList.remove("open");
+    });
+
+    $("saveConfigBtn").addEventListener("click", async () => {
+      const body = {
+        geminiModel: $("cfgGeminiModel").value.trim() || "gemini-2.5-flash",
+        standupFormat: $("cfgStandupFormat").value,
+      };
+      const key = $("cfgGeminiKey").value.trim();
+      if (key) body.geminiKey = key;
+      await api("/api/config", { method: "PUT", body: JSON.stringify(body) });
+      await loadSettings();
+      notify("Settings saved");
+    });
+
+    $("clearSavedKeyBtn").addEventListener("click", async () => {
+      await api("/api/config", { method: "PUT", body: JSON.stringify({ clearGeminiKey: true }) });
+      await loadSettings();
+      notify("Saved API key cleared");
+    });
+
+    $("addWatchForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const dirPath = $("watchDirInput").value.trim();
+      if (!dirPath) return;
+      try {
+        await api("/api/watch", { method: "POST", body: JSON.stringify({ dirPath }) });
+        $("watchDirInput").value = "";
+        await loadSettings();
+        await loadOverview(false);
+        notify("Watched folder added");
+      } catch (err) {
+        notify(err.message, true);
+      }
+    });
+
+    // Keyboard shortcuts: `/` focuses search, `Escape` closes modal or clears search
+    document.addEventListener("keydown", (e) => {
+      const tag = document.activeElement?.tagName;
+      const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      if (e.key === "/" && !inInput) {
+        e.preventDefault();
+        $("repoSearch").focus();
+      } else if (e.key === "Escape") {
+        if ($("settingsModal").classList.contains("open")) {
+          $("settingsModal").classList.remove("open");
+        } else if (document.activeElement === $("repoSearch") && $("repoSearch").value) {
+          $("repoSearch").value = "";
+          renderRepoList();
+        }
+      }
+    });
+
+    Promise.all([loadOverview(false), loadSettings()]);
+  </script>
+</body>
+</html>
