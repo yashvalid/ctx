@@ -1,29 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-color-mode="dark" data-dark-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ctx — Git Context</title>
   <style>
     :root {
-      --bg: #0b0d12;
-      --surface: #12151d;
-      --surface-2: #171b25;
-      --hover: rgba(255, 255, 255, 0.04);
-      --selected: rgba(96, 165, 250, 0.09);
-      --line: rgba(255, 255, 255, 0.08);
-      --line-strong: rgba(255, 255, 255, 0.14);
-      --text: #e8ecf2;
-      --text-soft: #9aa4b2;
-      --text-dim: #667080;
-      --accent: #60a5fa;
-      --accent-bg: rgba(96, 165, 250, 0.14);
-      --green: #4ade80;
-      --amber: #fbbf24;
-      --red: #f87171;
-      --purple: #c084fc;
-      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      --bg-canvas: #0d1117;
+      --bg-inset: #010409;
+      --bg-subtle: #161b22;
+      --bg-muted: #21262d;
+      --bg-hover: rgba(177, 186, 196, 0.08);
+      --bg-selected: rgba(56, 139, 253, 0.1);
+      --border: #30363d;
+      --border-muted: #21262d;
+      --fg-default: #e6edf3;
+      --fg-muted: #8d96a0;
+      --fg-subtle: #6e7681;
+      --accent: #4493f8;
+      --accent-emphasis: #1f6feb;
+      --accent-subtle: rgba(56, 139, 253, 0.15);
+      --btn-primary-bg: #238636;
+      --btn-primary-hover: #2ea043;
+      --btn-primary-border: rgba(240, 246, 252, 0.1);
+      --btn-bg: #21262d;
+      --btn-hover: #292e36;
+      --btn-hover-border: #8b949e;
+      --success: #3fb950;
+      --attention: #d29922;
+      --attention-subtle: rgba(187, 128, 9, 0.15);
+      --danger: #f85149;
+      --danger-subtle: rgba(248, 81, 73, 0.12);
+      --done: #a371f7;
+      --underline-active: #f78166;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
     }
 
     * { box-sizing: border-box; }
@@ -31,408 +42,464 @@
     html, body {
       margin: 0;
       padding: 0;
-      background: var(--bg);
-      color: var(--text);
+      background: var(--bg-canvas);
+      color: var(--fg-default);
       font-family: var(--sans);
-      font-size: 13.5px;
+      font-size: 14px;
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
       font-variant-numeric: tabular-nums;
     }
 
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 99px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    button, input, select, textarea {
-      font: inherit;
-      color: inherit;
+    button, input, select, textarea { font: inherit; color: inherit; }
+
+    /* GitHub Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 20px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--btn-bg);
+      color: var(--fg-default);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .btn:hover:not(:disabled) {
+      background: var(--btn-hover);
+      border-color: var(--btn-hover-border);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--btn-primary-bg);
+      border-color: var(--btn-primary-border);
+      color: #ffffff;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--btn-primary-hover);
+      border-color: var(--btn-primary-border);
     }
 
-    button {
+    .btn-ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--fg-muted);
+    }
+    .btn-ghost:hover:not(:disabled) {
+      background: var(--bg-hover);
+      border-color: transparent;
+      color: var(--fg-default);
+    }
+
+    .btn-danger { color: var(--danger); }
+    .btn-danger:hover:not(:disabled) {
+      background: var(--danger-subtle);
+      border-color: rgba(248, 81, 73, 0.45);
+      color: #ff7b72;
+    }
+
+    .btn-sm { padding: 3px 10px; font-size: 12px; line-height: 18px; }
+    .btn-icon {
+      padding: 4px 6px;
+      border-radius: 6px;
       background: transparent;
       border: 1px solid transparent;
-      border-radius: 6px;
-      padding: 5px 10px;
+      color: var(--fg-muted);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      color: var(--text-soft);
-      transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+      justify-content: center;
     }
-    button:hover:not(:disabled) {
-      background: var(--hover);
-      color: var(--text);
-    }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-icon:hover { background: var(--bg-hover); color: var(--fg-default); }
+    .btn-icon.danger:hover { background: var(--danger-subtle); color: var(--danger); }
 
-    button.subtle {
-      background: var(--surface-2);
-      border-color: var(--line);
-      color: var(--text);
-    }
-    button.subtle:hover:not(:disabled) {
-      border-color: var(--line-strong);
-      background: #1d222e;
-    }
-
-    button.primary {
-      background: var(--accent);
-      color: #08111e;
-      font-weight: 600;
-    }
-    button.primary:hover:not(:disabled) {
-      background: #7ab5fc;
-      color: #08111e;
-    }
-
-    button.danger-text:hover:not(:disabled) { color: var(--red); background: rgba(248, 113, 113, 0.1); }
-    button.sm { padding: 3px 8px; font-size: 12px; }
-    button.icon-btn {
-      padding: 2px 6px;
-      font-size: 13px;
-      line-height: 1;
-      border-radius: 4px;
-      color: var(--text-dim);
-    }
-
-    input[type="text"], input[type="password"], input[type="url"], select, textarea {
-      background: var(--surface);
-      border: 1px solid var(--line);
+    .form-control {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 6px 10px;
+      padding: 5px 10px;
+      font-size: 13px;
+      line-height: 20px;
+      color: var(--fg-default);
       outline: none;
-      transition: border-color 0.14s ease, background 0.14s ease;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
     }
-    input::placeholder, textarea::placeholder { color: var(--text-dim); }
-    input:focus, select:focus, textarea:focus {
-      border-color: rgba(96, 165, 250, 0.6);
-      background: var(--surface-2);
+    .form-control::placeholder { color: var(--fg-subtle); }
+    .form-control:focus {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px var(--accent);
     }
+    select.form-control { cursor: pointer; }
 
-    select { cursor: pointer; }
-
-    /* Header */
-    .topbar {
-      height: 52px;
-      padding: 0 24px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(11, 13, 18, 0.88);
-      backdrop-filter: blur(10px);
+    /* GitHub App Header & UnderlineNav */
+    .gh-header {
+      background: var(--bg-inset);
+      border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
       z-index: 20;
+    }
+    .gh-header-top {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 12px 24px 6px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
     }
-    .topbar-left {
+    .gh-brand {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--fg-default);
     }
-    .brand {
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: -0.02em;
-      color: var(--text);
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .brand-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 99px;
-      background: var(--accent);
-      box-shadow: 0 0 8px rgba(96, 165, 250, 0.65);
-    }
-    .segmented {
-      display: inline-flex;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 2px;
-      gap: 2px;
-    }
-    .segmented button {
-      padding: 4px 11px;
-      font-size: 12.5px;
-      border-radius: 5px;
-      border: none;
-      font-weight: 500;
-    }
-    .segmented button.active {
-      background: var(--surface-2);
-      color: var(--text);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    }
-    .topbar-right {
+    .gh-brand svg { color: var(--fg-default); }
+    .gh-slash { color: var(--fg-subtle); font-weight: 400; }
+    .gh-scope { color: var(--fg-muted); font-weight: 400; font-size: 14px; }
+
+    .gh-header-right {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
-    .stats-text {
+    .gh-meta-stats {
       font-size: 12px;
-      color: var(--text-dim);
+      color: var(--fg-muted);
       font-family: var(--mono);
     }
 
-    /* Main Layout */
-    .shell {
-      max-width: 1260px;
+    .underline-nav {
+      max-width: 1280px;
       margin: 0 auto;
-      padding: 20px 24px 36px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .underline-tab {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 12px 10px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+    }
+    .underline-tab:hover { color: var(--fg-default); }
+    .underline-tab:hover .tab-inner { background: var(--bg-hover); }
+    .underline-tab .tab-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 3px 6px;
+      border-radius: 6px;
+    }
+    .underline-tab.active {
+      color: var(--fg-default);
+      font-weight: 600;
+    }
+    .underline-tab.active::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: 0;
+      height: 2px;
+      background: var(--underline-active);
+      border-radius: 2px;
+    }
+    .counter {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      padding: 0 6px;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 18px;
+      border-radius: 99px;
+      background: rgba(110, 118, 129, 0.3);
+      color: var(--fg-default);
     }
 
-    .cockpit {
-      display: grid;
-      grid-template-columns: minmax(340px, 0.92fr) minmax(400px, 1.08fr);
-      gap: 20px;
-      align-items: start;
-    }
-    @media (max-width: 920px) {
-      .cockpit { grid-template-columns: 1fr; }
-      .shell { padding: 14px 16px; }
-      .topbar { padding: 0 16px; }
+    /* Main Container */
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px 24px 40px;
     }
 
-    .panel {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 10px;
+    /* GitHub Box */
+    .Box {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border);
+      border-radius: 6px;
       overflow: hidden;
     }
-
-    .panel-head {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--line);
+    .Box-header {
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .Box-body { padding: 16px; }
+    .Box-row {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-muted);
+    }
+    .Box-row:last-child { border-bottom: none; }
+
+    /* Cockpit Layout */
+    .cockpit {
+      display: grid;
+      grid-template-columns: minmax(340px, 0.94fr) minmax(420px, 1.06fr);
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 940px) {
+      .cockpit { grid-template-columns: 1fr; }
+      .gh-header-top, .underline-nav, .container { padding-left: 16px; padding-right: 16px; }
     }
 
-    .search-wrap {
+    .search-box {
       position: relative;
       flex: 1;
-      display: flex;
-      align-items: center;
+      min-width: 160px;
     }
-    .search-wrap input {
+    .search-box input {
       width: 100%;
+      padding-left: 30px;
       padding-right: 28px;
-      background: var(--bg);
     }
-    .kbd-hint {
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--fg-subtle);
+      pointer-events: none;
+      display: flex;
+    }
+    .kbd {
       position: absolute;
       right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
       font-family: var(--mono);
-      font-size: 10.5px;
-      color: var(--text-dim);
-      border: 1px solid var(--line);
+      font-size: 11px;
+      line-height: 16px;
+      padding: 0 5px;
+      color: var(--fg-subtle);
+      border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 0 4px;
       pointer-events: none;
     }
 
-    .toggle-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 12px;
-      color: var(--text-soft);
-      padding: 4px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      user-select: none;
-      border: 1px solid transparent;
-    }
-    .toggle-chip:hover { background: var(--hover); color: var(--text); }
-    .toggle-chip input { accent-color: var(--accent); cursor: pointer; }
-
-    /* Repo List */
+    /* Repo List Rows */
     .repo-list {
-      max-height: calc(100vh - 170px);
+      max-height: calc(100vh - 210px);
       overflow-y: auto;
     }
     .repo-row {
-      padding: 11px 14px;
-      border-bottom: 1px solid var(--line);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-muted);
       cursor: pointer;
       transition: background 0.1s ease;
     }
     .repo-row:last-child { border-bottom: none; }
-    .repo-row:hover { background: var(--hover); }
+    .repo-row:hover { background: var(--bg-subtle); }
     .repo-row.selected {
-      background: var(--selected);
+      background: var(--bg-selected);
       box-shadow: inset 2px 0 0 var(--accent);
     }
-    .repo-top {
+    .repo-row-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
     }
-    .repo-title {
+    .repo-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+    .repo-name-wrap svg { color: var(--fg-muted); flex-shrink: 0; }
+    .repo-name {
       font-weight: 600;
-      font-size: 13.5px;
-      color: var(--text);
+      font-size: 14px;
+      color: var(--accent);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .repo-right {
-      display: flex;
+    .repo-row.selected .repo-name { text-decoration: underline; }
+
+    .label-branch {
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
+      gap: 4px;
+      padding: 0 7px;
       font-family: var(--mono);
       font-size: 11.5px;
-    }
-    .branch-tag {
-      color: var(--accent);
-      background: var(--accent-bg);
-      padding: 1px 7px;
-      border-radius: 5px;
+      line-height: 20px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--fg-muted);
       max-width: 170px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .git-marks { color: var(--text-soft); display: inline-flex; gap: 5px; }
-    .c-green { color: var(--green); }
-    .c-amber { color: var(--amber); }
-    .c-red { color: var(--red); }
-    .c-purple { color: var(--purple); }
-    .c-dim { color: var(--text-dim); }
+    .label-branch svg { flex-shrink: 0; color: var(--fg-subtle); }
 
-    .repo-sub {
-      margin-top: 3px;
+    .repo-row-sub {
+      margin-top: 5px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
       font-size: 12px;
-      color: var(--text-dim);
+      color: var(--fg-muted);
     }
-    .repo-commit {
+    .commit-line {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .repo-counters {
+    .status-tokens {
       display: inline-flex;
-      gap: 8px;
+      align-items: center;
+      gap: 7px;
       flex-shrink: 0;
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 11.5px;
     }
+    .t-green { color: var(--success); }
+    .t-amber { color: var(--attention); }
+    .t-red { color: var(--danger); }
+    .t-done { color: var(--done); }
+    .t-muted { color: var(--fg-subtle); }
 
-    /* Detail Panel */
-    .detail-head {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--line);
+    /* Detail Pane */
+    .repo-title-bar {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: 12px;
-      flex-wrap: wrap;
+      width: 100%;
     }
-    .detail-name {
+    .repo-breadcrumb {
       font-size: 15px;
       font-weight: 600;
-      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 7px;
     }
-    .detail-path {
+    .repo-path {
       font-family: var(--mono);
       font-size: 11.5px;
-      color: var(--text-dim);
+      color: var(--fg-muted);
       margin-top: 2px;
       word-break: break-all;
     }
-    .detail-actions {
-      display: flex;
+    .btn-group {
+      display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
+      flex-wrap: wrap;
     }
-    .detail-body { padding: 16px 18px; }
 
-    .branch-bar {
+    .branch-toolbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--line);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-canvas);
       flex-wrap: wrap;
     }
-    .branch-select-wrap {
+    .branch-picker {
       display: flex;
       align-items: center;
       gap: 8px;
       flex: 1;
-      min-width: 200px;
+      min-width: 220px;
     }
-    .branch-select-wrap select {
+    .branch-picker select {
       font-family: var(--mono);
       font-size: 12.5px;
-      background: var(--bg);
-      max-width: 100%;
+      background: var(--btn-bg);
+      max-width: 300px;
       flex: 1;
     }
 
-    .block { margin-top: 18px; }
-    .block-label {
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--text-dim);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    .section-card {
+      margin-bottom: 14px;
     }
-
-    .link-row {
+    .section-card:last-child { margin-bottom: 0; }
+    .section-card-head {
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 14px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--fg-default);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 4px 0;
     }
-    .link-row a {
-      font-size: 13px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .section-card-head-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
     }
+    .section-card-head-left svg { color: var(--fg-muted); }
 
-    .clean-list {
-      display: flex;
-      flex-direction: column;
-    }
-    .clean-row {
+    .item-row {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 8px;
-      padding: 7px 6px;
-      border-radius: 6px;
-      transition: background 0.1s ease;
+      gap: 10px;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border-muted);
     }
-    .clean-row:hover { background: var(--hover); }
-    .clean-row .row-del { opacity: 0; transition: opacity 0.12s ease; }
-    .clean-row:hover .row-del, .clean-row:focus-within .row-del { opacity: 1; }
-    .clean-row-main {
+    .item-row:last-of-type { border-bottom: none; }
+    .item-row:hover { background: rgba(255, 255, 255, 0.02); }
+    .item-row .row-action { opacity: 0; transition: opacity 0.12s ease; }
+    .item-row:hover .row-action, .item-row:focus-within .row-action { opacity: 1; }
+
+    .item-main {
       display: flex;
       align-items: flex-start;
       gap: 9px;
@@ -440,139 +507,174 @@
       min-width: 0;
       word-break: break-word;
     }
-    .clean-row-main input[type="checkbox"] {
+    .item-main input[type="checkbox"] {
       margin-top: 3px;
-      accent-color: var(--accent);
+      accent-color: var(--accent-emphasis);
       cursor: pointer;
     }
-    .note-bullet {
-      color: var(--text-dim);
-      font-family: var(--mono);
-      user-select: none;
-    }
-    .todo-done { text-decoration: line-through; color: var(--text-dim); }
+    .todo-done { text-decoration: line-through; color: var(--fg-muted); }
 
-    .ghost-input-row {
+    .inline-compose {
       display: flex;
-      gap: 6px;
-      margin-top: 6px;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border-muted);
+      background: rgba(22, 27, 34, 0.45);
     }
-    .ghost-input-row input {
-      flex: 1;
-      background: transparent;
-      border-color: transparent;
-      border-bottom-color: var(--line);
-      border-radius: 0;
-      padding: 6px 4px;
+    .inline-compose input { flex: 1; }
+
+    .progress-track {
+      width: 64px;
+      height: 5px;
+      background: var(--bg-muted);
+      border-radius: 99px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
     }
-    .ghost-input-row input:focus {
-      background: transparent;
-      border-color: transparent;
-      border-bottom-color: var(--accent);
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 99px;
+      transition: width 0.2s ease;
     }
 
-    details.wip-details {
-      margin-top: 16px;
-      border-top: 1px solid var(--line);
-      padding-top: 12px;
-    }
-    details.wip-details summary {
+    details.wip-box summary {
+      list-style: none;
       cursor: pointer;
-      font-size: 12px;
-      color: var(--text-soft);
+      padding: 9px 14px;
+      background: var(--bg-subtle);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--fg-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       user-select: none;
     }
-    .wip-list {
-      margin-top: 8px;
+    details.wip-box[open] summary { border-bottom: 1px solid var(--border); color: var(--fg-default); }
+    .wip-file-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 14px;
+      border-bottom: 1px solid var(--border-muted);
       font-family: var(--mono);
-      font-size: 11.5px;
-      color: var(--text-soft);
-      max-height: 150px;
-      overflow-y: auto;
-      padding-left: 2px;
+      font-size: 12px;
+    }
+    .wip-file-row:last-child { border-bottom: none; }
+    .git-badge {
+      display: inline-block;
+      min-width: 22px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
     }
 
-    /* Studio */
-    .studio {
+    /* Standup & PR Studio */
+    .studio-grid {
       display: grid;
-      grid-template-columns: 270px 1fr;
+      grid-template-columns: 280px 1fr;
       gap: 20px;
       align-items: start;
     }
-    @media (max-width: 860px) {
-      .studio { grid-template-columns: 1fr; }
+    @media (max-width: 880px) {
+      .studio-grid { grid-template-columns: 1fr; }
     }
-    .studio-side { padding: 16px; }
+    .seg-control {
+      display: flex;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+      margin-bottom: 14px;
+    }
+    .seg-control button {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--fg-muted);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .seg-control button.active {
+      background: var(--bg-muted);
+      color: var(--fg-default);
+      font-weight: 600;
+    }
     .field {
       display: flex;
       flex-direction: column;
       gap: 5px;
-      margin-bottom: 13px;
+      margin-bottom: 12px;
     }
-    .field label {
-      font-size: 12px;
-      color: var(--text-soft);
-    }
-    .check-row {
+    .field label { font-size: 12px; font-weight: 600; color: var(--fg-default); }
+    .check-label {
       display: flex;
       align-items: center;
       gap: 7px;
       font-size: 12.5px;
-      color: var(--text-soft);
+      color: var(--fg-muted);
+      margin-bottom: 7px;
       cursor: pointer;
-      margin-bottom: 6px;
     }
-    .check-row input { accent-color: var(--accent); cursor: pointer; }
+    .check-label input { accent-color: var(--accent-emphasis); cursor: pointer; }
 
-    .output-area {
+    .flash {
+      padding: 10px 14px;
+      font-size: 12.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .flash-warn {
+      background: var(--attention-subtle);
+      color: #e3b341;
+      border-color: rgba(210, 153, 34, 0.35);
+    }
+    .flash-info {
+      background: var(--accent-subtle);
+      color: #79c0ff;
+      border: 1px solid rgba(56, 139, 253, 0.35);
+      border-radius: 6px;
+      margin-bottom: 14px;
+    }
+
+    .md-editor {
       width: 100%;
       min-height: 410px;
+      border: none;
+      background: var(--bg-canvas);
+      padding: 16px;
       font-family: var(--mono);
       font-size: 12.5px;
       line-height: 1.6;
+      color: var(--fg-default);
       resize: vertical;
-      border: none;
-      border-radius: 0;
-      padding: 16px 18px;
-      background: var(--surface);
-    }
-    .output-area:focus { background: var(--surface); }
-
-    .notice {
-      margin: 12px 18px 0;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12.5px;
-      background: rgba(251, 191, 36, 0.1);
-      border: 1px solid rgba(251, 191, 36, 0.25);
-      color: #fde68a;
-    }
-    .notice.info {
-      background: var(--accent-bg);
-      border-color: rgba(96, 165, 250, 0.25);
-      color: #bfdbfe;
-      margin: 0 0 14px 0;
+      outline: none;
     }
 
     .payload-details {
-      padding: 10px 18px 14px;
-      border-top: 1px solid var(--line);
+      border-top: 1px solid var(--border);
+      background: var(--bg-subtle);
+      padding: 9px 14px;
     }
     .payload-details summary {
       cursor: pointer;
       font-size: 12px;
-      color: var(--text-dim);
+      color: var(--fg-muted);
       user-select: none;
     }
     .payload-details pre {
-      margin: 10px 0 0;
+      margin: 10px 0 2px;
       padding: 10px 12px;
-      background: var(--bg);
-      border: 1px solid var(--line);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border);
       border-radius: 6px;
       font-family: var(--mono);
       font-size: 11.5px;
-      color: var(--text-soft);
+      color: var(--fg-muted);
       overflow-x: auto;
       max-height: 240px;
     }
@@ -581,8 +683,7 @@
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(4px);
+      background: rgba(1, 4, 9, 0.72);
       display: none;
       align-items: center;
       justify-content: center;
@@ -592,22 +693,26 @@
     .modal-backdrop.open { display: flex; }
     .modal {
       width: 100%;
-      max-width: 500px;
-      background: var(--surface);
-      border: 1px solid var(--line-strong);
-      border-radius: 12px;
+      max-width: 520px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
       overflow: hidden;
       max-height: 88vh;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 16px 48px rgba(1, 4, 9, 0.75);
     }
-    .modal-body { padding: 18px; overflow-y: auto; }
+    .modal-body {
+      padding: 16px;
+      overflow-y: auto;
+      background: var(--bg-canvas);
+    }
 
-    .empty {
+    .blankslate {
       padding: 40px 20px;
       text-align: center;
-      color: var(--text-dim);
+      color: var(--fg-muted);
       font-size: 13px;
     }
 
@@ -615,86 +720,118 @@
       position: fixed;
       right: 20px;
       bottom: 20px;
-      background: var(--surface-2);
-      border: 1px solid var(--line-strong);
-      color: var(--text);
-      padding: 9px 14px;
-      border-radius: 8px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--fg-default);
+      padding: 8px 14px;
+      border-radius: 6px;
       font-size: 12.5px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 8px 24px rgba(1, 4, 9, 0.65);
       opacity: 0;
       transform: translateY(8px);
       pointer-events: none;
-      transition: opacity 0.16s ease, transform 0.16s ease;
+      transition: opacity 0.15s ease, transform 0.15s ease;
       z-index: 60;
     }
     .toast.show { opacity: 1; transform: translateY(0); }
-    .toast.err { border-color: rgba(248, 113, 113, 0.45); color: #fecaca; }
+    .toast.err { border-color: rgba(248, 81, 73, 0.55); color: #ffa198; }
 
     .mono { font-family: var(--mono); }
     .small { font-size: 12px; }
-    .muted { color: var(--text-dim); }
+    .muted { color: var(--fg-muted); }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="brand">
-        <span class="brand-dot"></span>
+  <header class="gh-header">
+    <div class="gh-header-top">
+      <div class="gh-brand">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"/>
+        </svg>
         <span>ctx</span>
+        <span class="gh-slash">/</span>
+        <span class="gh-scope">workspace</span>
       </div>
-      <nav class="segmented" aria-label="Primary views">
-        <button class="active" data-tab="cockpit">Repos</button>
-        <button data-tab="studio">Standup &amp; PR</button>
-      </nav>
+      <div class="gh-header-right">
+        <span id="summaryStats" class="gh-meta-stats"></span>
+        <button id="settingsBtn" class="btn btn-sm">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63.27.385.506.792.704 1.218.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294.016.257.016.515 0 .772-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a7.977 7.977 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a5.909 5.909 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a5.738 5.738 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8.12 8.12 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6.214 6.214 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a7.92 7.92 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071.214-.143.437-.272.668-.386.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03 7.53.01 7.764 0 8 0Zm-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189-.173.086-.34.183-.5.29-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045-.22.312-.412.644-.573.99-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a4.709 4.709 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19.162.346.353.677.573.989.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27.161.107.328.204.501.29.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189.173-.086.34-.183.5-.29.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045.22-.313.411-.644.573-.99.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a4.709 4.709 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.464 6.464 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.44 4.44 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8Z"/>
+          </svg>
+          <span>Settings</span>
+        </button>
+      </div>
     </div>
-    <div class="topbar-right">
-      <span id="summaryStats" class="stats-text"></span>
-      <button id="settingsBtn">Settings</button>
-    </div>
+
+    <nav class="underline-nav" aria-label="Workspace sections">
+      <button class="underline-tab active" data-tab="cockpit">
+        <span class="tab-inner">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/>
+          </svg>
+          <span>Repositories</span>
+          <span id="repoCountBadge" class="counter">0</span>
+        </span>
+      </button>
+      <button class="underline-tab" data-tab="studio">
+        <span class="tab-inner">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
+          </svg>
+          <span>Standup &amp; PRs</span>
+        </span>
+      </button>
+    </nav>
   </header>
 
-  <main class="shell">
-    <!-- REPOS & CONTEXT -->
+  <main class="container">
+    <!-- REPOSITORIES -->
     <section id="tab-cockpit">
       <div class="cockpit">
-        <div class="panel">
-          <div class="panel-head">
-            <div class="search-wrap">
-              <input id="repoSearch" type="text" placeholder="Filter repos or branches..." />
-              <span class="kbd-hint">/</span>
+        <div class="Box">
+          <div class="Box-header">
+            <div class="search-box">
+              <span class="search-icon">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
+                </svg>
+              </span>
+              <input id="repoSearch" class="form-control" type="text" placeholder="Find a repository..." />
+              <span class="kbd">/</span>
             </div>
-            <label class="toggle-chip" title="Show only repos with local edits, unpushed commits, or stashes">
-              <input id="dirtyOnlyToggle" type="checkbox" />
+            <label class="btn btn-sm" style="gap:5px;" title="Show only repos with local edits, unpushed commits, or stashes">
+              <input id="dirtyOnlyToggle" type="checkbox" style="margin:0;accent-color:var(--accent-emphasis);" />
               <span>Dirty</span>
             </label>
-            <button id="refreshBtn" class="sm" title="Refresh status">Refresh</button>
-            <button id="fetchAllBtn" class="sm" title="Run git fetch --prune across repos">Fetch</button>
-            <button id="addRepoToggleBtn" class="sm subtle">+ Add</button>
+            <button id="refreshBtn" class="btn btn-sm" title="Refresh status">Refresh</button>
+            <button id="fetchAllBtn" class="btn btn-sm" title="Run git fetch --prune across repos">Fetch</button>
+            <button id="addRepoToggleBtn" class="btn btn-primary btn-sm">New</button>
           </div>
-          <form id="addRepoForm" class="panel-head" style="display:none;background:var(--bg);">
-            <input id="addRepoPath" type="text" placeholder="Path to git repo or workspace folder..." style="flex:1;" />
-            <select id="addRepoMode">
-              <option value="repo">Repo</option>
+          <form id="addRepoForm" class="Box-header" style="display:none;background:var(--bg-canvas);">
+            <input id="addRepoPath" class="form-control" type="text" placeholder="Path to git repo or parent folder..." style="flex:1;" />
+            <select id="addRepoMode" class="form-control">
+              <option value="repo">Add Repo</option>
               <option value="watch">Watch Folder</option>
             </select>
-            <button type="submit" class="sm primary">Save</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
           </form>
           <div id="repoList" class="repo-list">
-            <div class="empty">Scanning repositories...</div>
+            <div class="blankslate">Scanning repositories...</div>
           </div>
         </div>
 
-        <div class="panel">
-          <div class="detail-head">
-            <div>
-              <div id="detailRepoName" class="detail-name">Select a repository</div>
-              <div id="detailRepoPath" class="detail-path"></div>
+        <div class="Box">
+          <div class="Box-header">
+            <div class="repo-title-bar">
+              <div>
+                <div id="detailRepoName" class="repo-breadcrumb">Select a repository</div>
+                <div id="detailRepoPath" class="repo-path"></div>
+              </div>
+              <div class="btn-group" id="detailRepoActions"></div>
             </div>
-            <div class="detail-actions" id="detailRepoActions"></div>
           </div>
-          <div class="detail-body" id="detailBody">
-            <div class="empty">Choose a repository to view or edit branch notes, TODOs, and links.</div>
+          <div id="detailBody">
+            <div class="blankslate">Select a repository to inspect its branch notes, tasks, and links.</div>
           </div>
         </div>
       </div>
@@ -702,69 +839,74 @@
 
     <!-- STANDUP & PR STUDIO -->
     <section id="tab-studio" style="display:none;">
-      <div class="studio">
-        <div class="panel studio-side">
-          <div class="segmented" style="width:100%;margin-bottom:16px;">
-            <button id="modeStandupBtn" class="active" style="flex:1;justify-content:center;">Standup</button>
-            <button id="modePrBtn" style="flex:1;justify-content:center;">PR Draft</button>
+      <div class="studio-grid">
+        <div class="Box">
+          <div class="Box-header">
+            <span style="font-weight:600;font-size:13px;">Generator</span>
           </div>
+          <div class="Box-body">
+            <div class="seg-control">
+              <button id="modeStandupBtn" class="active">Standup</button>
+              <button id="modePrBtn">PR Draft</button>
+            </div>
 
-          <div id="standupControls">
-            <div class="field">
-              <label for="standupSince">Window</label>
-              <select id="standupSince">
-                <option value="">Last workday (Fri on Mon)</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="today">Today</option>
-                <option value="2d">Last 2 days</option>
-                <option value="3d">Last 3 days</option>
-                <option value="7d">Last 7 days</option>
-              </select>
+            <div id="standupControls">
+              <div class="field">
+                <label for="standupSince">Time window</label>
+                <select id="standupSince" class="form-control">
+                  <option value="">Last workday (Fri on Mon)</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="today">Today</option>
+                  <option value="2d">Last 2 days</option>
+                  <option value="3d">Last 3 days</option>
+                  <option value="7d">Last 7 days</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="standupFormat">Format</label>
+                <select id="standupFormat" class="form-control">
+                  <option value="markdown">Markdown</option>
+                  <option value="slack">Slack bullets</option>
+                </select>
+              </div>
+              <label class="check-label"><input type="checkbox" id="standupAllAuthors" /> Include all authors</label>
+              <label class="check-label"><input type="checkbox" id="standupRaw" /> Offline raw mode</label>
+              <button id="generateStandupBtn" class="btn btn-primary" style="width:100%;margin-top:8px;">Generate Standup</button>
             </div>
-            <div class="field">
-              <label for="standupFormat">Format</label>
-              <select id="standupFormat">
-                <option value="markdown">Markdown</option>
-                <option value="slack">Slack bullets</option>
-              </select>
-            </div>
-            <label class="check-row"><input type="checkbox" id="standupAllAuthors" /> All commit authors</label>
-            <label class="check-row"><input type="checkbox" id="standupRaw" /> Offline raw mode</label>
-            <button id="generateStandupBtn" class="primary" style="width:100%;justify-content:center;margin-top:10px;">Generate Standup</button>
-          </div>
 
-          <div id="prControls" style="display:none;">
-            <div class="field">
-              <label for="prRepoSelect">Repository</label>
-              <select id="prRepoSelect"></select>
+            <div id="prControls" style="display:none;">
+              <div class="field">
+                <label for="prRepoSelect">Repository</label>
+                <select id="prRepoSelect" class="form-control"></select>
+              </div>
+              <div class="field">
+                <label for="prBranchInput">Compare branch</label>
+                <input id="prBranchInput" class="form-control" type="text" placeholder="Current branch" />
+              </div>
+              <div class="field">
+                <label for="prBaseInput">Base branch</label>
+                <input id="prBaseInput" class="form-control" type="text" placeholder="Auto (main / master)" />
+              </div>
+              <label class="check-label"><input type="checkbox" id="prRaw" /> Offline raw mode</label>
+              <button id="generatePrBtn" class="btn btn-primary" style="width:100%;margin-top:8px;">Draft PR Description</button>
             </div>
-            <div class="field">
-              <label for="prBranchInput">Source branch</label>
-              <input id="prBranchInput" type="text" placeholder="Current branch" />
-            </div>
-            <div class="field">
-              <label for="prBaseInput">Base branch</label>
-              <input id="prBaseInput" type="text" placeholder="Auto (main / master)" />
-            </div>
-            <label class="check-row"><input type="checkbox" id="prRaw" /> Offline raw mode</label>
-            <button id="generatePrBtn" class="primary" style="width:100%;justify-content:center;margin-top:10px;">Draft PR Description</button>
-          </div>
 
-          <div class="small muted" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
-            Metadata-only: only commit subjects, file paths, and your notes/TODOs leave this machine.
+            <div class="small muted" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-muted);">
+              Metadata-only: only commit subjects, file paths, and your notes/tasks are sent to Gemini.
+            </div>
           </div>
         </div>
 
-        <div class="panel">
-          <div class="panel-head">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span style="font-weight:600;">Output</span>
-              <span id="studioModeLabel" class="small mono muted"></span>
+        <div class="Box">
+          <div class="Box-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-weight:600;font-size:13px;">Preview</span>
+              <span id="studioModeLabel" class="label-branch" style="display:none;"></span>
             </div>
-            <button id="copyOutputBtn" class="sm subtle">Copy</button>
+            <button id="copyOutputBtn" class="btn btn-sm">Copy</button>
           </div>
-          <div id="studioWarning" class="notice" style="display:none;"></div>
-          <textarea id="studioOutput" class="output-area" placeholder="Generate a standup or PR draft..."></textarea>
+          <div id="studioWarning" class="flash flash-warn" style="display:none;"></div>
+          <textarea id="studioOutput" class="md-editor" placeholder="Generate a standup or pull request draft..."></textarea>
           <details class="payload-details">
             <summary>Inspect metadata payload</summary>
             <pre id="studioMetadata">(nothing generated yet)</pre>
@@ -777,39 +919,39 @@
   <!-- SETTINGS MODAL -->
   <div id="settingsModal" class="modal-backdrop">
     <div class="modal">
-      <div class="panel-head">
-        <span style="font-weight:600;">Settings</span>
-        <button id="closeSettingsBtn" class="sm">Esc</button>
+      <div class="Box-header">
+        <span style="font-weight:600;font-size:14px;">Settings</span>
+        <button id="closeSettingsBtn" class="btn btn-sm">Esc</button>
       </div>
       <div class="modal-body">
-        <div id="keyStatusBanner" class="notice info"></div>
+        <div id="keyStatusBanner" class="flash flash-info"></div>
 
         <div class="field">
-          <label for="cfgGeminiKey">Gemini API Key (leave blank to keep existing or use GEMINI_API_KEY)</label>
+          <label for="cfgGeminiKey">Gemini API key (leave blank to keep existing or use GEMINI_API_KEY)</label>
           <div style="display:flex;gap:8px;">
-            <input id="cfgGeminiKey" type="password" placeholder="AIza..." style="flex:1;" />
-            <button id="clearSavedKeyBtn" class="sm danger-text">Clear</button>
+            <input id="cfgGeminiKey" class="form-control" type="password" placeholder="AIza..." style="flex:1;" />
+            <button id="clearSavedKeyBtn" class="btn btn-sm btn-danger">Clear</button>
           </div>
         </div>
         <div class="field">
           <label for="cfgGeminiModel">Model</label>
-          <input id="cfgGeminiModel" type="text" placeholder="gemini-2.5-flash" />
+          <input id="cfgGeminiModel" class="form-control" type="text" placeholder="gemini-2.5-flash" />
         </div>
         <div class="field">
           <label for="cfgStandupFormat">Default standup format</label>
-          <select id="cfgStandupFormat">
+          <select id="cfgStandupFormat" class="form-control">
             <option value="markdown">Markdown</option>
             <option value="slack">Slack</option>
           </select>
         </div>
-        <button id="saveConfigBtn" class="primary">Save</button>
+        <button id="saveConfigBtn" class="btn btn-primary">Save settings</button>
 
-        <div class="block" style="margin-top:22px;padding-top:16px;border-top:1px solid var(--line);">
-          <div class="block-label">Watched folders</div>
-          <div id="watchedDirsList" class="clean-list"></div>
-          <form id="addWatchForm" class="ghost-input-row">
-            <input id="watchDirInput" type="text" placeholder="Add parent folder to watch (e.g. C:\Users\Lenovo\dev)" />
-            <button type="submit" class="sm subtle">Watch</button>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-muted);">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Watched folders</div>
+          <div id="watchedDirsList" class="Box" style="margin-bottom:10px;"></div>
+          <form id="addWatchForm" style="display:flex;gap:8px;">
+            <input id="watchDirInput" class="form-control" type="text" placeholder="e.g. C:\Users\Lenovo\projects" style="flex:1;" />
+            <button type="submit" class="btn btn-sm">Watch</button>
           </form>
         </div>
       </div>
@@ -829,6 +971,22 @@
     };
 
     const $ = (id) => document.getElementById(id);
+
+    const ICONS = {
+      repo: '<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>',
+      branch: '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>',
+      comment: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0 1 13.25 12H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 13.543V12H2.75A1.75 1.75 0 0 1 1 10.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h4.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>',
+      checklist: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 1.75v11.5c0 .138.112.25.25.25h3.17a.75.75 0 0 1 0 1.5H2.75A1.75 1.75 0 0 1 1 13.25V1.75C1 .784 1.784 0 2.75 0h8.5C12.216 0 13 .784 13 1.75v7.736a.75.75 0 0 1-1.5 0V1.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25Zm13.274 9.537v-.001l-4.557 4.45a.75.75 0 0 1-1.055-.008l-1.943-1.95a.75.75 0 0 1 1.062-1.058l1.419 1.425 4.026-3.932a.75.75 0 1 1 1.048 1.074ZM4.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM4 7.75A.75.75 0 0 1 4.75 7h2.5a.75.75 0 0 1 0 1.5h-2.5A.75.75 0 0 1 4 7.75Z"/></svg>',
+      link: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"/></svg>',
+    };
+
+    function iconSpan(name) {
+      const s = document.createElement("span");
+      s.style.display = "inline-flex";
+      s.style.alignItems = "center";
+      s.innerHTML = ICONS[name] || "";
+      return s;
+    }
 
     let toastTimer = null;
     function notify(msg, isErr = false) {
@@ -873,9 +1031,9 @@
       const sec = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
       if (Number.isNaN(sec)) return "";
       if (sec < 60) return "just now";
-      if (sec < 3600) return Math.floor(sec / 60) + "m";
-      if (sec < 86400) return Math.floor(sec / 3600) + "h";
-      return Math.floor(sec / 86400) + "d";
+      if (sec < 3600) return Math.floor(sec / 60) + "m ago";
+      if (sec < 86400) return Math.floor(sec / 3600) + "h ago";
+      return Math.floor(sec / 86400) + "d ago";
     }
 
     async function loadOverview(fetchAll = false) {
@@ -911,7 +1069,8 @@
         i.status.staged + i.status.modified + i.status.untracked + i.status.conflicted + i.status.ahead > 0
       ).length;
       const todos = state.overview.reduce((s, i) => s + i.totalOpenTodos, 0);
-      $("summaryStats").textContent = `${total} repos · ${dirty} dirty · ${todos} todos`;
+      $("repoCountBadge").textContent = String(total);
+      $("summaryStats").textContent = `${dirty} dirty · ${todos} open tasks`;
     }
 
     function renderRepoList() {
@@ -935,53 +1094,54 @@
 
       if (filtered.length === 0) {
         list.appendChild(el("div", {
-          class: "empty",
-          text: state.overview.length === 0 ? "No tracked repositories yet. Click + Add." : "No matching repositories.",
+          class: "blankslate",
+          text: state.overview.length === 0 ? "No tracked repositories yet. Click New to add one." : "No repositories match your filter.",
         }));
         return;
       }
 
       for (const item of filtered) {
         const s = item.status;
-        const marks = [];
+        const tokens = [];
         if (s.missing) {
-          marks.push(el("span", { class: "c-red", text: "missing" }));
+          tokens.push(el("span", { class: "t-red", text: "missing" }));
         } else {
-          if (s.conflicted > 0) marks.push(el("span", { class: "c-red", text: `!${s.conflicted}` }));
-          if (s.staged > 0) marks.push(el("span", { class: "c-green", text: `+${s.staged}` }));
-          if (s.modified > 0) marks.push(el("span", { class: "c-amber", text: `~${s.modified}` }));
-          if (s.untracked > 0) marks.push(el("span", { class: "c-dim", text: `?${s.untracked}` }));
-          if (s.ahead > 0) marks.push(el("span", { class: "c-green", text: `↑${s.ahead}` }));
-          if (s.behind > 0) marks.push(el("span", { class: "c-amber", text: `↓${s.behind}` }));
-          if (s.stashCount > 0) marks.push(el("span", { class: "c-purple", text: `s:${s.stashCount}` }));
+          if (s.conflicted > 0) tokens.push(el("span", { class: "t-red", text: `!${s.conflicted}` }));
+          if (s.staged > 0) tokens.push(el("span", { class: "t-green", text: `+${s.staged}` }));
+          if (s.modified > 0) tokens.push(el("span", { class: "t-amber", text: `~${s.modified}` }));
+          if (s.untracked > 0) tokens.push(el("span", { class: "t-muted", text: `?${s.untracked}` }));
+          if (s.ahead > 0) tokens.push(el("span", { class: "t-green", text: `↑${s.ahead}` }));
+          if (s.behind > 0) tokens.push(el("span", { class: "t-amber", text: `↓${s.behind}` }));
+          if (s.stashCount > 0) tokens.push(el("span", { class: "t-done", text: `stash:${s.stashCount}` }));
         }
-
-        const counters = [];
         if (item.currentBranchOpenTodos > 0) {
-          counters.push(el("span", { class: "c-amber", text: `${item.currentBranchOpenTodos} todo` }));
+          tokens.push(el("span", { class: "t-amber", text: `${item.currentBranchOpenTodos} tasks` }));
         }
         if (item.currentBranchNotes > 0) {
-          counters.push(el("span", { class: "c-dim", text: `${item.currentBranchNotes} note` }));
-        }
-        if (s.lastCommit) {
-          counters.push(el("span", { class: "c-dim", text: relTime(s.lastCommit.committedAt) }));
+          tokens.push(el("span", { class: "t-muted", text: `${item.currentBranchNotes} notes` }));
         }
 
-        const commitText = s.lastCommit ? s.lastCommit.subject : (s.error || "No commits");
+        const commitText = s.lastCommit
+          ? `${s.lastCommit.subject}${s.lastCommit.committedAt ? " · Updated " + relTime(s.lastCommit.committedAt) : ""}`
+          : (s.error || "No commits yet");
+
         const row = el("div", {
           class: `repo-row ${item.repo.id === state.selectedRepoId ? "selected" : ""}`,
           onClick: () => selectRepo(item.repo.id),
         }, [
-          el("div", { class: "repo-top" }, [
-            el("span", { class: "repo-title", text: item.repo.name }),
-            el("div", { class: "repo-right" }, [
-              marks.length > 0 ? el("span", { class: "git-marks" }, marks) : null,
-              el("span", { class: "branch-tag", text: s.branch }),
+          el("div", { class: "repo-row-top" }, [
+            el("div", { class: "repo-name-wrap" }, [
+              iconSpan("repo"),
+              el("span", { class: "repo-name", text: item.repo.name }),
+            ]),
+            el("span", { class: "label-branch", title: s.branch }, [
+              iconSpan("branch"),
+              el("span", { text: s.branch, style: "overflow:hidden;text-overflow:ellipsis;" }),
             ]),
           ]),
-          el("div", { class: "repo-sub" }, [
-            el("span", { class: "repo-commit", text: commitText }),
-            el("span", { class: "repo-counters" }, counters),
+          el("div", { class: "repo-row-sub" }, [
+            el("span", { class: "commit-line", text: commitText }),
+            tokens.length > 0 ? el("span", { class: "status-tokens" }, tokens) : null,
           ]),
         ]);
         list.appendChild(row);
@@ -1002,7 +1162,10 @@
       $("detailRepoPath").textContent = "";
       $("detailRepoActions").innerHTML = "";
       $("detailBody").innerHTML = "";
-      $("detailBody").appendChild(el("div", { class: "empty", text: "Choose a repository to view or edit branch notes, TODOs, and links." }));
+      $("detailBody").appendChild(el("div", {
+        class: "blankslate",
+        text: "Select a repository to inspect its branch notes, tasks, and links.",
+      }));
     }
 
     async function loadRepoDetail(repoId, branchOverride = null) {
@@ -1016,13 +1179,16 @@
       const d = state.repoDetail;
       if (!d) return;
 
-      $("detailRepoName").textContent = d.repo.name;
+      const nameEl = $("detailRepoName");
+      nameEl.innerHTML = "";
+      nameEl.appendChild(iconSpan("repo"));
+      nameEl.appendChild(el("span", { text: d.repo.name }));
       $("detailRepoPath").textContent = d.repo.rootPath;
 
       const actions = $("detailRepoActions");
       actions.innerHTML = "";
       actions.appendChild(el("button", {
-        class: "sm",
+        class: "btn btn-sm",
         text: "Fetch",
         onClick: async (e) => {
           e.target.disabled = true;
@@ -1038,9 +1204,9 @@
         },
       }));
       actions.appendChild(el("button", {
-        class: `sm ${d.hook.installed ? "subtle" : ""}`,
+        class: "btn btn-sm",
         text: d.hook.installed ? "Hook: On" : "Hook: Off",
-        title: d.hook.installed ? "Click to remove post-checkout hook" : "Click to install post-checkout hook",
+        title: d.hook.installed ? "Remove post-checkout recall hook" : "Install post-checkout recall hook",
         onClick: async () => {
           const action = d.hook.installed ? "uninstall" : "install";
           await api(`/api/repos/${d.repo.id}/hook`, {
@@ -1054,7 +1220,7 @@
 
       const confirming = state.confirmUntrackId === d.repo.id;
       actions.appendChild(el("button", {
-        class: `sm danger-text ${confirming ? "subtle" : ""}`,
+        class: "btn btn-sm btn-danger",
         text: confirming ? "Confirm?" : "Untrack",
         onClick: async () => {
           if (!confirming) {
@@ -1079,10 +1245,11 @@
       const body = $("detailBody");
       body.innerHTML = "";
 
-      // Branch switcher select
+      // Branch bar
       const branchSet = new Set([d.currentBranch, ...d.branchSummaries.map((b) => b.branch), ...d.localBranches]);
       const summaryByBranch = new Map(d.branchSummaries.map((b) => [b.branch, b]));
       const branchSelect = el("select", {
+        class: "form-control",
         onChange: () => {
           state.editingLink = false;
           loadRepoDetail(d.repo.id, branchSelect.value);
@@ -1103,23 +1270,25 @@
       }
       branchSelect.value = d.selectedBranch;
 
-      body.appendChild(el("div", { class: "branch-bar" }, [
-        el("div", { class: "branch-select-wrap" }, [
-          el("span", { class: "small muted", text: "Branch" }),
+      body.appendChild(el("div", { class: "branch-toolbar" }, [
+        el("div", { class: "branch-picker" }, [
+          iconSpan("branch"),
           branchSelect,
         ]),
         d.context.lastVisitedAt
-          ? el("span", { class: "small mono muted", text: `visited ${relTime(d.context.lastVisitedAt)}` })
+          ? el("span", { class: "small muted mono", text: `Visited ${relTime(d.context.lastVisitedAt)}` })
           : null,
       ]));
 
-      // Link block
-      const linkBlock = el("div", { class: "block" });
-      linkBlock.appendChild(el("div", { class: "block-label" }, [
-        el("span", { text: "PR / Ticket Link" }),
+      const sectionsWrap = el("div", { class: "Box-body" });
+
+      // PR / Ticket Link Box
+      const linkBox = el("div", { class: "Box section-card" });
+      linkBox.appendChild(el("div", { class: "section-card-head" }, [
+        el("span", { class: "section-card-head-left" }, [iconSpan("link"), el("span", { text: "Linked PR or Issue" })]),
         d.context.link && !state.editingLink
           ? el("button", {
-              class: "sm",
+              class: "btn btn-ghost btn-sm",
               text: "Edit",
               onClick: () => { state.editingLink = true; renderRepoDetail(); },
             })
@@ -1127,12 +1296,14 @@
       ]));
       if (d.context.link && !state.editingLink) {
         const isSafeHttp = /^https?:\/\//i.test(d.context.link);
-        linkBlock.appendChild(el("div", { class: "link-row" }, [
-          isSafeHttp
-            ? el("a", { href: d.context.link, target: "_blank", rel: "noopener noreferrer", text: d.context.link })
-            : el("span", { class: "small mono", text: d.context.link }),
+        linkBox.appendChild(el("div", { class: "item-row" }, [
+          el("div", { class: "item-main" }, [
+            isSafeHttp
+              ? el("a", { href: d.context.link, target: "_blank", rel: "noopener noreferrer", text: d.context.link })
+              : el("span", { class: "small mono", text: d.context.link }),
+          ]),
           el("button", {
-            class: "icon-btn danger-text",
+            class: "btn-icon danger row-action",
             text: "×",
             title: "Clear link",
             onClick: async () => {
@@ -1146,12 +1317,14 @@
         ]));
       } else {
         const linkInput = el("input", {
+          class: "form-control",
           type: "url",
           value: d.context.link || "",
-          placeholder: "Attach PR or Jira / Linear URL...",
+          placeholder: "https://github.com/org/repo/pull/123",
         });
-        linkBlock.appendChild(el("form", {
-          class: "ghost-input-row",
+        linkBox.appendChild(el("form", {
+          class: "inline-compose",
+          style: "border-top:none;",
           onSubmit: async (e) => {
             e.preventDefault();
             await api("/api/context/link", {
@@ -1163,96 +1336,63 @@
           },
         }, [
           linkInput,
-          el("button", { type: "submit", class: "sm", text: "Save" }),
+          el("button", { type: "submit", class: "btn btn-sm", text: "Save" }),
         ]));
       }
-      body.appendChild(linkBlock);
+      sectionsWrap.appendChild(linkBox);
 
-      // Notes block
-      const notesBlock = el("div", { class: "block" });
-      notesBlock.appendChild(el("div", { class: "block-label" }, [
-        el("span", { text: "Notes" }),
-        d.context.notes.length > 0 ? el("span", { class: "mono", text: String(d.context.notes.length) }) : null,
+      // Tasks (TODOs) Box with GitHub tasklist progress
+      const totalTodos = d.context.todos.length;
+      const doneCount = d.context.todos.filter((t) => t.done).length;
+      const pct = totalTodos > 0 ? Math.round((doneCount / totalTodos) * 100) : 0;
+
+      const todoBox = el("div", { class: "Box section-card" });
+      todoBox.appendChild(el("div", { class: "section-card-head" }, [
+        el("span", { class: "section-card-head-left" }, [
+          iconSpan("checklist"),
+          el("span", { text: "Tasks" }),
+          totalTodos > 0 ? el("span", { class: "counter", text: `${doneCount}/${totalTodos}` }) : null,
+        ]),
+        totalTodos > 0
+          ? el("span", { class: "progress-track", title: `${pct}% complete` }, [
+              el("span", { class: "progress-fill", style: `width:${pct}%;` }),
+            ])
+          : null,
       ]));
-      const notesList = el("div", { class: "clean-list" });
-      for (const n of d.context.notes) {
-        notesList.appendChild(el("div", { class: "clean-row" }, [
-          el("div", { class: "clean-row-main" }, [
-            el("span", { class: "note-bullet", text: "•" }),
-            el("div", { style: "flex:1;" }, [
-              el("div", { text: n.content }),
-              el("div", { class: "small muted", text: relTime(n.createdAt) }),
-            ]),
-          ]),
-          el("button", {
-            class: "icon-btn danger-text row-del",
-            text: "×",
-            title: "Delete note",
-            onClick: async () => {
-              await api(`/api/context/notes/${n.id}`, { method: "DELETE" });
+
+      if (totalTodos > 0) {
+        for (const t of d.context.todos) {
+          const cb = el("input", {
+            type: "checkbox",
+            ...(t.done ? { checked: true } : {}),
+            onChange: async () => {
+              await api(`/api/context/todos/${t.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ done: cb.checked }),
+              });
               await loadOverview(false);
             },
-          }),
-        ]));
-      }
-      const noteInput = el("input", { type: "text", placeholder: "+ Add note..." });
-      notesBlock.appendChild(notesList);
-      notesBlock.appendChild(el("form", {
-        class: "ghost-input-row",
-        onSubmit: async (e) => {
-          e.preventDefault();
-          const val = noteInput.value.trim();
-          if (!val) return;
-          await api("/api/context/notes", {
-            method: "POST",
-            body: JSON.stringify({ commonDir: d.repo.commonDir, branch: d.selectedBranch, content: val }),
           });
-          noteInput.value = "";
-          await loadOverview(false);
-        },
-      }, [noteInput]));
-      body.appendChild(notesBlock);
-
-      // TODOs block
-      const openCount = d.context.todos.filter((t) => !t.done).length;
-      const todosBlock = el("div", { class: "block" });
-      todosBlock.appendChild(el("div", { class: "block-label" }, [
-        el("span", { text: "TODOs" }),
-        openCount > 0 ? el("span", { class: "mono c-amber", text: `${openCount} open` }) : null,
-      ]));
-      const todosList = el("div", { class: "clean-list" });
-      for (const t of d.context.todos) {
-        const cb = el("input", {
-          type: "checkbox",
-          ...(t.done ? { checked: true } : {}),
-          onChange: async () => {
-            await api(`/api/context/todos/${t.id}`, {
-              method: "PATCH",
-              body: JSON.stringify({ done: cb.checked }),
-            });
-            await loadOverview(false);
-          },
-        });
-        todosList.appendChild(el("div", { class: "clean-row" }, [
-          el("label", { class: "clean-row-main", style: "cursor:pointer;" }, [
-            cb,
-            el("span", { class: t.done ? "todo-done" : "", text: t.text }),
-          ]),
-          el("button", {
-            class: "icon-btn danger-text row-del",
-            text: "×",
-            title: "Delete TODO",
-            onClick: async () => {
-              await api(`/api/context/todos/${t.id}`, { method: "DELETE" });
-              await loadOverview(false);
-            },
-          }),
-        ]));
+          todoBox.appendChild(el("div", { class: "item-row" }, [
+            el("label", { class: "item-main", style: "cursor:pointer;" }, [
+              cb,
+              el("span", { class: t.done ? "todo-done" : "", text: t.text }),
+            ]),
+            el("button", {
+              class: "btn-icon danger row-action",
+              text: "×",
+              title: "Delete task",
+              onClick: async () => {
+                await api(`/api/context/todos/${t.id}`, { method: "DELETE" });
+                await loadOverview(false);
+              },
+            }),
+          ]));
+        }
       }
-      const todoInput = el("input", { type: "text", placeholder: "+ Add TODO..." });
-      todosBlock.appendChild(todosList);
-      todosBlock.appendChild(el("form", {
-        class: "ghost-input-row",
+      const todoInput = el("input", { class: "form-control", type: "text", placeholder: "Add a task..." });
+      todoBox.appendChild(el("form", {
+        class: "inline-compose",
         onSubmit: async (e) => {
           e.preventDefault();
           const val = todoInput.value.trim();
@@ -1264,17 +1404,72 @@
           todoInput.value = "";
           await loadOverview(false);
         },
-      }, [todoInput]));
-      body.appendChild(todosBlock);
+      }, [todoInput, el("button", { type: "submit", class: "btn btn-sm", text: "Add" })]));
+      sectionsWrap.appendChild(todoBox);
 
-      // Collapsible working tree WIP files
-      if (d.selectedBranch === d.currentBranch && d.status.dirtyFiles.length > 0) {
-        const details = el("details", { class: "wip-details" }, [
-          el("summary", { text: `Working tree WIP (${d.status.dirtyFiles.length} files)` }),
-          el("div", { class: "wip-list" }, d.status.dirtyFiles.map((f) => el("div", { text: `${f.code}  ${f.path}` }))),
-        ]);
-        body.appendChild(details);
+      // Branch Notes Box
+      const notesBox = el("div", { class: "Box section-card" });
+      notesBox.appendChild(el("div", { class: "section-card-head" }, [
+        el("span", { class: "section-card-head-left" }, [
+          iconSpan("comment"),
+          el("span", { text: "Branch Notes" }),
+          d.context.notes.length > 0 ? el("span", { class: "counter", text: String(d.context.notes.length) }) : null,
+        ]),
+      ]));
+      for (const n of d.context.notes) {
+        notesBox.appendChild(el("div", { class: "item-row" }, [
+          el("div", { class: "item-main" }, [
+            el("div", { style: "flex:1;" }, [
+              el("div", { text: n.content }),
+              el("div", { class: "small muted", text: `Saved ${relTime(n.createdAt)}` }),
+            ]),
+          ]),
+          el("button", {
+            class: "btn-icon danger row-action",
+            text: "×",
+            title: "Delete note",
+            onClick: async () => {
+              await api(`/api/context/notes/${n.id}`, { method: "DELETE" });
+              await loadOverview(false);
+            },
+          }),
+        ]));
       }
+      const noteInput = el("input", { class: "form-control", type: "text", placeholder: "Leave a note for this branch..." });
+      notesBox.appendChild(el("form", {
+        class: "inline-compose",
+        onSubmit: async (e) => {
+          e.preventDefault();
+          const val = noteInput.value.trim();
+          if (!val) return;
+          await api("/api/context/notes", {
+            method: "POST",
+            body: JSON.stringify({ commonDir: d.repo.commonDir, branch: d.selectedBranch, content: val }),
+          });
+          noteInput.value = "";
+          await loadOverview(false);
+        },
+      }, [noteInput, el("button", { type: "submit", class: "btn btn-primary btn-sm", text: "Comment" })]));
+      sectionsWrap.appendChild(notesBox);
+
+      // Working Tree Changed Files (collapsible GitHub file list)
+      if (d.selectedBranch === d.currentBranch && d.status.dirtyFiles.length > 0) {
+        const wipBox = el("details", { class: "Box section-card wip-box" });
+        wipBox.appendChild(el("summary", {}, [
+          el("span", { text: `Working tree changes (${d.status.dirtyFiles.length} files)` }),
+          el("span", { class: "small muted", text: "Show" }),
+        ]));
+        for (const f of d.status.dirtyFiles) {
+          const badgeClass = f.code.includes("?") ? "t-green" : f.code.includes("D") ? "t-red" : "t-amber";
+          wipBox.appendChild(el("div", { class: "wip-file-row" }, [
+            el("span", { class: `git-badge ${badgeClass}`, text: f.code }),
+            el("span", { text: f.path }),
+          ]));
+        }
+        sectionsWrap.appendChild(wipBox);
+      }
+
+      body.appendChild(sectionsWrap);
     }
 
     function renderPrRepoOptions() {
@@ -1308,13 +1503,13 @@
       const list = $("watchedDirsList");
       list.innerHTML = "";
       if (watchData.dirs.length === 0) {
-        list.appendChild(el("div", { class: "small muted", text: "No watched folders configured." }));
+        list.appendChild(el("div", { class: "Box-row small muted", text: "No watched folders configured." }));
       } else {
         for (const d of watchData.dirs) {
-          list.appendChild(el("div", { class: "clean-row" }, [
+          list.appendChild(el("div", { class: "item-row" }, [
             el("span", { class: "mono small", text: d.dirPath }),
             el("button", {
-              class: "icon-btn danger-text row-del",
+              class: "btn-icon danger row-action",
               text: "×",
               title: "Stop watching",
               onClick: async () => {
@@ -1330,8 +1525,10 @@
     function showStudioResult(res) {
       $("studioOutput").value = res.markdown || "";
       $("studioMetadata").textContent = JSON.stringify(res.payload, null, 2);
-      $("studioModeLabel").textContent =
-        res.mode === "gemini" ? "gemini" : res.mode === "fallback" ? "offline fallback" : "raw";
+      const label = $("studioModeLabel");
+      label.style.display = "inline-flex";
+      label.textContent =
+        res.mode === "gemini" ? "Gemini AI" : res.mode === "fallback" ? "Offline fallback" : "Raw metadata";
       if (res.warning) {
         $("studioWarning").style.display = "block";
         $("studioWarning").textContent = res.warning;
@@ -1341,9 +1538,9 @@
     }
 
     // Navigation & actions
-    document.querySelectorAll(".topbar nav button").forEach((btn) => {
+    document.querySelectorAll(".underline-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
-        document.querySelectorAll(".topbar nav button").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".underline-tab").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         const tab = btn.dataset.tab;
         $("tab-cockpit").style.display = tab === "cockpit" ? "block" : "none";
@@ -1493,7 +1690,6 @@
       }
     });
 
-    // Keyboard shortcuts: `/` focuses search, `Escape` closes modal or clears search
     document.addEventListener("keydown", (e) => {
       const tag = document.activeElement?.tagName;
       const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
