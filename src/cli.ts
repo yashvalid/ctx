@@ -668,16 +668,34 @@ export async function runCli(argv: string[], cwd = process.cwd()): Promise<numbe
       await syncWatchedDirs(store);
       const portRaw = flagString(flags, "port");
       const port = portRaw ? parsePositiveInt(portRaw, "port") : 4312;
-      const server = startUiServer({
-        store,
-        cliEntryPath: import.meta.path,
-        port,
-      });
-      const url = `http://127.0.0.1:${server.port}`;
-      console.log(`${paint.bold("ctx UI")} listening at ${paint.cyan(url)}`);
+      const url = `http://127.0.0.1:${port}`;
+      let server: ReturnType<typeof startUiServer>;
+      try {
+        server = startUiServer({
+          store,
+          cliEntryPath: import.meta.path,
+          port,
+        });
+      } catch (err) {
+        try {
+          const probe = await fetch(`${url}/api/activity`);
+          if (probe.ok) {
+            console.log(`${paint.bold("ctx UI")} is already running at ${paint.cyan(url)}`);
+            if (!flagBool(flags, "no-open")) {
+              openBrowser(url);
+            }
+            return 0;
+          }
+        } catch {
+          // Probe failed; surface the original bind error below.
+        }
+        throw err;
+      }
+      const listeningUrl = `http://127.0.0.1:${server.port}`;
+      console.log(`${paint.bold("ctx UI")} listening at ${paint.cyan(listeningUrl)}`);
       console.log(paint.dim("Press Ctrl+C to stop."));
       if (!flagBool(flags, "no-open")) {
-        openBrowser(url);
+        openBrowser(listeningUrl);
       }
       await new Promise<void>((resolve) => {
         const stop = () => {
